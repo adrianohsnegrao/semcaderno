@@ -329,7 +329,7 @@ The exact initial profile, including normalization, Argon2id, 12-hour expiry, fi
 
 Cycle 024 implements only the framework-independent inner boundary. `normalizePrimaryEmail` validates the accepted ASCII mailbox profile and lowercases the complete address into an application-owned nominal type. `PasswordVerificationPort` receives that normalized value plus the transient NFC-normalized password and returns only verified, email-verification-required, or invalid; adapter failure rejects. `SessionIssuanceTransactionPort` receives explicit User/time values and versioned session/CSRF digests only, with optional prior-session digest for fixation replacement. Compile-time purpose brands prevent session, pre-session-CSRF, and authenticated-CSRF digests from being substituted for one another without changing their runtime representation. The port returns safe issued-session identity/expiry and has no selected-Business or bearer field.
 
-No sign-in coordinator, Argon2 adapter, password row, transaction, CSPRNG, digest derivation, session insertion, rate-limit store, cookie writer, CSRF validator, or HTTP mapping is implemented by this profile.
+Cycle 025 fulfills `PasswordVerificationPort` in PostgreSQL infrastructure without changing its application-owned signature. The adapter owns the parameterized normalized-email lookup, Argon2id PHC validation/comparison, fixed dummy work, persistence-row mapping, and fail-closed infrastructure boundary. Application still receives no password verifier, Argon2 type, PostgreSQL row, or database error. No sign-in coordinator, issuance transaction implementation, CSPRNG, digest derivation, session insertion, rate-limit store, cookie writer, CSRF validator, or HTTP mapping is implemented.
 
 Refresh or revalidate session:
 

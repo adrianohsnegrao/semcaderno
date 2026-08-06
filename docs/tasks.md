@@ -3240,3 +3240,84 @@ Cycle 024 makes verifier ownership and outcomes executable while leaving infrast
 Explicit non-goals:
 
 - No pre-session challenge, session-CSRF, or rate-limit migration; no session issuance transaction, CSPRNG/HMAC issuance, ID00/ID04 route, cookie writing, CSRF enforcement, registration, recovery, logout, authorization/Membership, Business switching, product API/UI, mobile, provider, telemetry, deployment, or merchant user testing.
+
+## Cycle 025 — Password Verification Persistence Foundation
+
+### Task 001 — Implement the Argon2id Credential Verification Adapter and Minimum User Password-Credential Migration
+
+Status: Complete. The application-owned password-verification port is implemented by PostgreSQL infrastructure with real Argon2id and real PostgreSQL 18.4 evidence; no sign-in orchestration, issuance, HTTP, cookie, or later-cycle behavior was added.
+
+Objective:
+
+Add the minimum reviewed Argon2id dependency, one hash-only User credential migration, and one direct PostgreSQL adapter that preserves the Cycle 024 verified/email-verification-required/invalid outcomes while failing closed on persistence or verifier faults.
+
+Authority and preflight:
+
+- `AGENTS.md`, the repository-local `sem-caderno-cycle` Skill, README, Cycle 023/024 evidence, ADR 0035, application/authentication/session/persistence/transport specifications, architecture, security/privacy, test strategy, migration tooling, existing package boundaries, source, and tests were inspected before editing.
+- Git preflight found `main` at accepted Cycle 024 SHA `706aa957c4dffbffd784402134c1534c97dc8664`, three commits, clean worktree, matching `origin/main` and live remote, exact SSH origin, no generated output, no running container, and no Cycle 025 implementation.
+- The authority matrix confirmed the unchanged application port; normalized `users.email_normalized` lookup; one credential row per User; Argon2id PHC minimums; fixed dummy work; verified/email-verification-required/invalid outcomes; fail-closed database/decoder/verifier behavior; and real PostgreSQL ownership. Session/CSRF issuance, HTTP, cookies, authorization, and product behavior remain outside this cycle.
+
+Dependency and supply-chain decision:
+
+- `argon2` 0.45.1 is owned only by `@sem-caderno/persistence-postgres`. Registry and maintainer evidence confirms Argon2id PHC verification, bundled TypeScript declarations, Node-API prebuilt/native support, and Node 24 compatibility.
+- The exact package is pinned. Its deterministic native install command is reviewed through pnpm `allowBuilds`; strict dependency-build, release-age, frozen-lockfile, and lockfile-trust policies remain enabled.
+- The lockfile adds only `argon2` and its direct `@phc/format`, `cross-env`, `node-addon-api`, and `node-gyp-build` dependency closure. No unrelated application/authentication dependency or override was introduced.
+
+Implementation:
+
+- `20260806000100-create-user-password-credentials.ts` creates only `sem_caderno.user_password_credentials`: User primary/restrictive foreign key, Argon2id PHC verifier, creation/update instants, and positive version. Named checks enforce algorithm prefix, chronology, and version. No separate identifier or index is needed.
+- `PostgresPasswordVerificationAdapter` implements the existing application port with one parameterized normalized-email query and one direct row mapping. Correct proof returns verified or email-verification-required according to accepted User evidence.
+- Wrong password returns invalid. Unknown email, missing credential, and disabled User run the same fixed non-secret dummy Argon2id verifier class before returning invalid. Tests assert control flow, not wall-clock equivalence; no constant-time claim is made.
+- Stored PHC evidence must be Argon2id version 19 with at least memory 19,456 KiB, iterations 2, parallelism 1, a 16-byte salt, and a 32-byte result. Invalid row, PHC decoder, Argon runtime, verifier callback, connection, or query failure rejects with a fixed internal message and never becomes invalid.
+- Raw password is transient verifier input only. Persistence stores only the PHC verifier. Application/contracts expose no hash, Argon2, PostgreSQL, dummy verifier, SQL, or infrastructure error.
+
+Files and boundaries:
+
+- Production: new persistence adapter and export; one migration; narrow architecture dependency allowlist.
+- Tests: new real PostgreSQL password-verification suite; existing session migration inventory updated for the fourth migration; root database gate now executes the complete persistence test directory.
+- Metadata: persistence manifest, root lockfile, and pnpm native-build allowlist add only exact `argon2` 0.45.1 and its reviewed closure.
+- Documentation: README, architecture, application/persistence/sign-in/tooling specifications, test strategy, security/privacy, and this task checkpoint describe actual implementation and deferrals. No ADR was created or changed because ADR 0035 already owns the durable boundary.
+
+Ralph loop and corrections:
+
+- The bounded Ralph loop used four meaningful implementation/validation iterations and stopped at Cycle 025 GREEN. Iteration 1 implemented the slice; its focused PostgreSQL test found a test-only SQLSTATE mismatch. Iteration 2 corrected the expected restrictive-delete code from foreign-key violation `23503` to PostgreSQL `restrict_violation` `23001`; all 23 persistence tests passed. Iteration 3 removed an unnecessary non-null assertion found by ESLint. Iteration 4 added the exact `argon2` persistence allowlist required by architecture validation; lint, type-check, architecture, focused PostgreSQL tests, and the complete repository validation then passed.
+- Tooling corrections outside the meaningful loop: an exploratory dependency declaration path used `.d.ts` instead of the package's `.d.cts`; a root probe used the ambient Node 20 and could not resolve the workspace-owned package; and an isolated persistence type-check omitted the required application build prerequisite. Each was rerun through the approved Node 24.19.0 workspace path without changing semantics.
+
+Validation evidence:
+
+- Pre-edit checks passed the pinned runtime, static four-migration predecessor baseline, 22 application tests, and 12 real PostgreSQL session tests. Dependency installation passed pnpm supply-chain policy and the reviewed native lifecycle.
+- Focused migration compilation/static validation passed four ordered TypeScript sources. The corrected persistence gate passed 23 tests across two files against disposable PostgreSQL 18.4 containers.
+- Formatting, 63-file documentation validation with 375 links and 108 tables, ESLint, every workspace type-check, seven-workspace manifest validation, dependency-cruiser over 50 modules/48 dependencies, and the architecture self-test passed.
+- Aggregate tests passed 188 cases: 81 contract, 22 application, 62 server, and 23 real PostgreSQL persistence tests, plus the controlled architecture-validator self-test. Contracts, domain, application, persistence, server, database tool, and neutral Next.js production builds passed. Static migration validation passed four sources.
+- Frozen offline installation passed with the exact lockfile. The complete root `pnpm run validate` passed before cleanup. Clean-state validation, final scans, and repository status are rerun before closure.
+
+Security, privacy, and overengineering:
+
+- Fixed internal failures redact SQL, PHC content, raw password, and native causes. No raw password is persisted or logged; no hash is exported through application/contracts. Generic invalid proof remains externally enumeration-safe, and infrastructure failures remain distinct.
+- No IP, user agent, device/fingerprint/location data, request/login history, analytics, telemetry, provider value, Business/Membership fact, or authorization cache was added.
+- Retained only one concrete adapter, one local verifier-function seam needed to prove real/dummy/failure behavior, and one credential table. Rejected generic credential/repository/hash strategy, DI, transaction, clock, request-context, audit, provider, and migration frameworks.
+
+Deferred and not applicable:
+
+- Production password creation/rehashing, pre-session challenge, session/authenticated-CSRF issuance, rate limiting, CSPRNG/HMAC issuance, sign-in orchestration, Fastify ID00/ID04, cookies, CSRF enforcement, registration/recovery/logout, authorization/Membership, Business switching, product UI/API, mobile, provider, telemetry, deployment, and retention remain deliberately deferred.
+- Browser/mobile/provider/deployment/accessibility/product-validation and merchant user-testing gates are not applicable because no merchant-facing workflow exists.
+
+Recommended next cycle:
+
+Cycle 026 — Pre-Session CSRF Persistence Foundation.
+
+Recommended next task:
+
+Task 001 — Implement Digest-Only Pre-Session Challenge Creation and Consumption Boundaries.
+
+Objective:
+
+Implement only the accepted ID00 pre-session CSRF evidence derivation, digest-only challenge persistence, explicit-time lifecycle, and one-time consumption boundaries required before atomic sign-in issuance.
+
+Why next:
+
+Password verification now has its real infrastructure implementation. The next smallest independent prerequisite for the accepted atomic sign-in transaction is the pre-session challenge boundary; implementing it before session issuance keeps browser evidence, digest persistence, and one-time lifecycle testable without starting HTTP sign-in.
+
+Explicit non-goals:
+
+- No password-verification redesign, session insertion, authenticated-CSRF session columns, aggregate rate limiting, complete sign-in transaction, Fastify ID00/ID04 route, cookie writing, authorization, product UI, provider, deployment, or merchant user testing.

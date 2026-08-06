@@ -22,7 +22,7 @@
     "contract:test": "vitest run packages/contracts/test",
     "application:test": "vitest run packages/application/test",
     "mapping:test": "pnpm run prepare:edge-types && pnpm run build:database && vitest run apps/server/test",
-    "database:test": "pnpm run build:database && vitest run packages/persistence-postgres/test/session-resolution.postgres.test.ts",
+    "database:test": "pnpm run build:database && vitest run packages/persistence-postgres/test",
     "test": "pnpm run contract:test && pnpm run application:test && pnpm run mapping:test && pnpm run database:test && pnpm run test:architecture",
     "test:architecture": "pnpm run architecture:self-test",
     "build:contracts": "pnpm --filter @sem-caderno/contracts run build",

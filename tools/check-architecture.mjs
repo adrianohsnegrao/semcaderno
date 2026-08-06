@@ -41,7 +41,10 @@ const allowedExternalDependencies = new Map([
   ['@sem-caderno/domain', new Set()],
   ['@sem-caderno/application', new Set()],
   ['@sem-caderno/contracts', new Set(['zod'])],
-  ['@sem-caderno/persistence-postgres', new Set(['pg', '@types/pg', '@testcontainers/postgresql'])],
+  [
+    '@sem-caderno/persistence-postgres',
+    new Set(['argon2', 'pg', '@types/pg', '@testcontainers/postgresql']),
+  ],
   ['@sem-caderno/database-migrations', new Set(['node-pg-migrate', 'pg', '@types/pg'])],
 ]);
 

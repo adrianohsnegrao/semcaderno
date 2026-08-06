@@ -170,7 +170,7 @@ Cycles 010 through 014 close the topology, language, runtime, web, server, valid
 - Future mobile Sale, Payment, Expense, and correction scope.
 - Customer duplicate-warning presentation; phone and email remain non-unique by accepted rule.
 - Business-local visible sale/payment numbering.
-- Exact maintained Argon2 implementation package/version and its reviewed build/supply-chain profile.
+- Future Argon2 parameter upgrades and credential-rehash policy after measured production evidence.
 - Email delivery provider.
 - Session/HMAC key rotation/cutover, cleanup/retention, login/logout/revocation commands, and deployment secret management.
 - Sign-in/session/CSRF implementation, protected-operation authorization, and Business switching remain separate from the implemented ID05 read boundary.
@@ -222,9 +222,13 @@ The server security edge independently generates fresh opaque session, pre-sessi
 
 Cycle 024 implements the browser-safe ID00/ID04 schemas and inferred transport types without a route. ID04 input remains a strict email/password object; its parsed password is NFC-normalized, while primary-email normalization remains application-owned. Responses are additive and expose only pre-session/authenticated CSRF evidence, safe User identity, and expiry where accepted. `AUTHENTICATION_FAILED` is now a stable 401 Problem Details code.
 
-Application owns a branded normalized-email value, one deterministic ASCII mailbox normalizer, the three-outcome password-verification port, and one digest-only issuance transaction port. The issuance input contains explicit User/time values plus session, pre-session-CSRF, authenticated-CSRF, and optional prior-session digests; it contains no raw session/CSRF evidence, selected Business, HTTP, cookie, HMAC key, Argon2, PostgreSQL, or transport type. No verification adapter, orchestration, transaction implementation, credential generation, or persistence is added.
+Application owns a branded normalized-email value, one deterministic ASCII mailbox normalizer, the three-outcome password-verification port, and one digest-only issuance transaction port. The issuance input contains explicit User/time values plus session, pre-session-CSRF, authenticated-CSRF, and optional prior-session digests; it contains no raw session/CSRF evidence, selected Business, HTTP, cookie, HMAC key, Argon2, PostgreSQL, or transport type.
 
-ID00/ID04 HTTP exposure and all infrastructure remain future executable boundaries. ID04 will write the existing profile cookie only after commit and return the independent authenticated CSRF value in a no-store body. Session creation authenticates only global User identity; future protected operations still revalidate Business, Membership, capability, lifecycle, and same-Business references. [ADR 0035](decisions/0035-local-email-password-session-csrf-issuance.md) and the [Session Issuance and Sign-In Specification](../specs/session-issuance-sign-in-specification.md) own the exact profile.
+Cycle 025 implements only the verification adapter in `@sem-caderno/persistence-postgres`. It performs one parameterized lookup by the existing normalized primary email, validates the stored Argon2id PHC profile, and invokes `argon2` 0.45.1 once with either the persisted verifier or a fixed non-secret dummy verifier. Correct proof returns verified or email-verification-required according to existing User evidence; wrong, unknown, disabled, or missing-credential cases return invalid. Database, row, PHC-decoder, native verifier, and unexpected verifier failures reject and never become invalid proof.
+
+The fourth migration adds only `user_password_credentials`: one restrictive User-owned row containing the Argon2id PHC verifier, creation/update instants, and positive version. The primary key is the User foreign key, so no extra identifier or lookup index is introduced. Password hashing/creation, verifier upgrades, sign-in orchestration, challenge/session issuance, and HTTP remain absent.
+
+ID00/ID04 HTTP exposure and issuance infrastructure remain future executable boundaries. ID04 will write the existing profile cookie only after commit and return the independent authenticated CSRF value in a no-store body. Session creation authenticates only global User identity; future protected operations still revalidate Business, Membership, capability, lifecycle, and same-Business references. [ADR 0035](decisions/0035-local-email-password-session-csrf-issuance.md) and the [Session Issuance and Sign-In Specification](../specs/session-issuance-sign-in-specification.md) own the exact profile.
 
 ## Current Executable Baseline Non-Goals
 

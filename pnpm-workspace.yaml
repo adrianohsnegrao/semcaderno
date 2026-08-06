@@ -38,6 +38,7 @@ trustLockfile: false
 blockExoticSubdeps: true
 strictDepBuilds: true
 allowBuilds:
+  argon2: true
   cpu-features: false
   protobufjs: false
   ssh2: false

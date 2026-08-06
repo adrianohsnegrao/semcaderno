@@ -16,6 +16,7 @@
   "dependencies": {
     "@sem-caderno/application": "workspace:*",
     "@sem-caderno/domain": "workspace:*",
+    "argon2": "0.45.1",
     "pg": "8.22.0"
   },
   "devDependencies": {

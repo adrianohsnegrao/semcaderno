@@ -356,12 +356,20 @@ Cycle 024 implements the reviewed inner contract/application boundary without in
 
 Focused tests prove valid/invalid/boundary transport behavior, additive/strict policies, normalization determinism, non-mutation, serialization, generic error identity, verifier failure separation, digest-only issuance, and public-export safety. No adapter, orchestration, database change, credential generation, HMAC, route, cookie, or CSRF enforcement is added.
 
-## 20. Recommended Next Cycle
+## 20. Cycle 025 Password Verification Persistence Profile
 
-**Cycle 025 - Password Verification Persistence Foundation**
+Cycle 025 selects exact `argon2` 0.45.1 in `@sem-caderno/persistence-postgres`. Its reviewed Node-API native install is explicitly allowlisted; no Argon2 or Node runtime type enters application or contracts. The adapter accepts the existing normalized-email/password input, runs one parameterized lookup, validates standard Argon2id PHC version 19 with at least the accepted memory/time/parallelism, 16-byte salt, and 32-byte output, then performs exactly one real-or-fixed-dummy verification operation.
 
-**Task 001 - Implement the Argon2id Credential Verification Adapter and Minimum User Password-Credential Migration**
+Correct proof for a usable verified User returns verified; correct proof for an email-unverified User returns email-verification-required. Wrong password, unknown email, disabled User, and absent credential binding return invalid after verifier work. PostgreSQL, row, PHC decoder, and Argon verifier failures reject with fixed internal messages and never become invalid.
 
-Objective: select and verify the exact maintained Argon2 package, add only the authorized `user_password_credentials` migration, implement `PasswordVerificationPort` in PostgreSQL infrastructure, and prove verified/unverified/invalid/dummy-work/failure behavior against real PostgreSQL.
+The ordered credential migration stores one restrictive User-owned Argon2id PHC verifier, timestamps, and positive version. It stores no raw password, algorithm column, password history, provider value, session/CSRF evidence, Business/Membership fact, device/request data, or telemetry. Real PostgreSQL 18.4 tests prove this narrow persistence and adapter boundary. Production password creation/rehashing, sign-in orchestration, challenge/session issuance, HTTP, and cookie behavior remain absent.
 
-Explicit non-goals: no session/challenge/CSRF/rate-limit migration, session issuance transaction, CSPRNG or HMAC issuance, Fastify ID00/ID04 route, cookie writing, CSRF enforcement, registration, recovery, logout, authorization, Business selection, UI, provider, deployment, or merchant testing.
+## 21. Recommended Next Cycle
+
+**Cycle 026 - Pre-Session CSRF Persistence Foundation**
+
+**Task 001 - Implement Digest-Only Pre-Session Challenge Creation and Consumption Boundaries**
+
+Objective: implement only the accepted ID00 pre-session CSRF evidence derivation, digest-only challenge persistence, explicit-time lifecycle, and one-time consumption boundaries required before atomic sign-in issuance.
+
+Explicit non-goals: no password-verification redesign, session insertion, authenticated-CSRF session columns, aggregate rate limiting, complete sign-in transaction, Fastify ID00/ID04 route, cookie writing, authorization, product UI, provider, deployment, or merchant testing.
