@@ -1,14 +1,21 @@
 export {
+  createPreSessionChallenge,
   normalizePrimaryEmail,
   type AuthenticatedCsrfDigest,
+  type ConsumePreSessionChallengeInput,
+  type CreatedPreSessionChallenge,
+  type CreatePreSessionChallenge,
+  type CreatePreSessionChallengeInput,
   type IssuedSession,
   type IssueSessionInput,
   type NormalizedEmail,
   type PasswordVerificationPort,
   type PasswordVerificationResult,
+  type PreSessionChallengePort,
   type PreSessionCsrfDigest,
   type SessionCredentialDigest,
   type SessionIssuanceTransactionPort,
+  type StorePreSessionChallengeInput,
   type VerifyPasswordInput,
 } from './sign-in.js';
 export {

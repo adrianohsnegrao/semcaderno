@@ -74,6 +74,57 @@ export type AuthenticatedCsrfDigest = Readonly<{
   readonly [authenticatedCsrfDigestBrand]: true;
 }>;
 
+export type CreatePreSessionChallengeInput = Readonly<{
+  challengeDigest: PreSessionCsrfDigest;
+  createdAt: Date;
+}>;
+
+export type StorePreSessionChallengeInput = Readonly<{
+  challengeDigest: PreSessionCsrfDigest;
+  createdAt: Date;
+  expiresAt: Date;
+}>;
+
+export type ConsumePreSessionChallengeInput = Readonly<{
+  challengeDigest: PreSessionCsrfDigest;
+  consumedAt: Date;
+}>;
+
+export type CreatedPreSessionChallenge = Readonly<{
+  expiresAt: Date;
+}>;
+
+export interface PreSessionChallengePort {
+  create(input: StorePreSessionChallengeInput): Promise<void>;
+  consume(input: ConsumePreSessionChallengeInput): Promise<boolean>;
+}
+
+export interface CreatePreSessionChallenge {
+  execute(input: CreatePreSessionChallengeInput): Promise<CreatedPreSessionChallenge>;
+}
+
+const preSessionChallengeLifetimeMilliseconds = 10 * 60 * 1_000;
+
+export const createPreSessionChallenge = (
+  challenges: PreSessionChallengePort,
+): CreatePreSessionChallenge => ({
+  async execute(input) {
+    const createdAtMilliseconds = input.createdAt.getTime();
+    const expiresAtMilliseconds = createdAtMilliseconds + preSessionChallengeLifetimeMilliseconds;
+    if (!Number.isFinite(createdAtMilliseconds) || !Number.isFinite(expiresAtMilliseconds)) {
+      throw new TypeError('Pre-session challenge creation instant is invalid.');
+    }
+
+    await challenges.create({
+      challengeDigest: input.challengeDigest,
+      createdAt: new Date(createdAtMilliseconds),
+      expiresAt: new Date(expiresAtMilliseconds),
+    });
+
+    return Object.freeze({ expiresAt: new Date(expiresAtMilliseconds) });
+  },
+});
+
 export type IssueSessionInput = Readonly<{
   userId: string;
   issuedAt: Date;

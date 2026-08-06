@@ -331,6 +331,8 @@ Cycle 024 implements only the framework-independent inner boundary. `normalizePr
 
 Cycle 025 fulfills `PasswordVerificationPort` in PostgreSQL infrastructure without changing its application-owned signature. The adapter owns the parameterized normalized-email lookup, Argon2id PHC validation/comparison, fixed dummy work, persistence-row mapping, and fail-closed infrastructure boundary. Application still receives no password verifier, Argon2 type, PostgreSQL row, or database error. No sign-in coordinator, issuance transaction implementation, CSPRNG, digest derivation, session insertion, rate-limit store, cookie writer, CSRF validator, or HTTP mapping is implemented.
 
+Cycle 026 adds `PreSessionChallengePort` with only digest-only creation and one-time consumption operations. `createPreSessionChallenge` owns the exact ten-minute lifetime calculation from one explicit `createdAt`; persistence receives the branded pre-session digest and cloned UTC instants, never raw `p1` evidence or an HMAC key. Consumption returns only consumed versus rejected so unknown, expired, and replayed challenges do not become distinguishable application outcomes; infrastructure failure rejects. The existing `SessionIssuanceTransactionPort` remains the authority for consuming this evidence atomically with future session issuance.
+
 Refresh or revalidate session:
 
 - Purpose: determine whether session remains valid and whether active Business context still authorizes use.

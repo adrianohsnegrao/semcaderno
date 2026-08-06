@@ -364,12 +364,20 @@ Correct proof for a usable verified User returns verified; correct proof for an 
 
 The ordered credential migration stores one restrictive User-owned Argon2id PHC verifier, timestamps, and positive version. It stores no raw password, algorithm column, password history, provider value, session/CSRF evidence, Business/Membership fact, device/request data, or telemetry. Real PostgreSQL 18.4 tests prove this narrow persistence and adapter boundary. Production password creation/rehashing, sign-in orchestration, challenge/session issuance, HTTP, and cookie behavior remain absent.
 
-## 21. Recommended Next Cycle
+## 21. Cycle 026 Pre-Session Challenge Persistence Profile
 
-**Cycle 026 - Pre-Session CSRF Persistence Foundation**
+Cycle 026 implements the application-owned `PreSessionChallengePort` and a creation use case that calculates `expiresAt = createdAt + 600 seconds` from one explicit instant. The server edge validates canonical `p1` evidence and uses the accepted version-1 HMAC key with UTF-8 `sem-caderno/session-csrf/v1`, one zero byte, and the exact 32 evidence bytes. It returns only a purpose-branded 43-character digest; no CSPRNG, route, or raw-value persistence is added.
 
-**Task 001 - Implement Digest-Only Pre-Session Challenge Creation and Consumption Boundaries**
+The ordered migration creates only UUIDv7 identity, digest version/bytes, creation, expiry, nullable consumption, and positive version. One direct PostgreSQL adapter inserts that state and consumes it with a parameterized atomic update requiring an active half-open lifetime. Unknown, expired, equal-expiry, and replayed evidence return one negative internal result. Database and decoding failures reject. Real PostgreSQL 18.4 tests prove migration integrity, digest-only storage, constraints, replay rejection, and exactly one winner under concurrent consumption.
 
-Objective: implement only the accepted ID00 pre-session CSRF evidence derivation, digest-only challenge persistence, explicit-time lifecycle, and one-time consumption boundaries required before atomic sign-in issuance.
+This standalone lifecycle boundary does not replace the accepted atomic issuance requirement. A future `SessionIssuanceTransactionPort` adapter must perform the same challenge predicate inside the transaction that revalidates User, revokes prior presented session, inserts the fresh session, records safe audit evidence, and clears rate state.
 
-Explicit non-goals: no password-verification redesign, session insertion, authenticated-CSRF session columns, aggregate rate limiting, complete sign-in transaction, Fastify ID00/ID04 route, cookie writing, authorization, product UI, provider, deployment, or merchant testing.
+## 22. Recommended Next Cycle
+
+**Cycle 027 - Sign-In Rate-Limit Persistence Foundation**
+
+**Task 001 - Implement Account-Keyed Aggregate Failure Tracking and Clearing Boundaries**
+
+Objective: implement only the accepted versioned normalized-identity HMAC derivation and bounded PostgreSQL aggregate needed to record, evaluate, and clear the 10-failures-per-15-minutes sign-in limit before atomic session issuance.
+
+Explicit non-goals: no complete sign-in coordinator or transaction, session/authenticated-CSRF migration, CSPRNG session issuance, ID00/ID04 Fastify route, cookie writing, authorization, IP/device tracking, attempt history, product UI, provider, deployment, or merchant testing.

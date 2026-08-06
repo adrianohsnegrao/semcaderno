@@ -3321,3 +3321,73 @@ Password verification now has its real infrastructure implementation. The next s
 Explicit non-goals:
 
 - No password-verification redesign, session insertion, authenticated-CSRF session columns, aggregate rate limiting, complete sign-in transaction, Fastify ID00/ID04 route, cookie writing, authorization, product UI, provider, deployment, or merchant user testing.
+
+## Cycle 026 — Pre-Session CSRF Persistence Foundation
+
+### Task 001 — Implement Digest-Only Pre-Session Challenge Creation and Consumption Boundaries
+
+Status: Complete. The accepted pre-session CSRF evidence now has a server-edge digest derivation, application-owned ten-minute lifecycle boundary, digest-only PostgreSQL state, and atomic one-time consumption with real PostgreSQL evidence. No HTTP sign-in, token generation, session issuance, cookie, or later-cycle behavior was added.
+
+Objective:
+
+Implement only the accepted ID00 pre-session CSRF evidence derivation, digest-only challenge persistence, explicit-time lifecycle, and one-time consumption boundaries required before atomic sign-in issuance.
+
+Authority and boundary:
+
+- `createPreSessionChallenge` derives the exact ten-minute expiry from one explicit `createdAt` and sends only the purpose-branded digest plus cloned lifecycle instants through application-owned `PreSessionChallengePort`.
+- The server edge accepts only canonical `p1.` plus 43-character unpadded base64url evidence, reuses the accepted server-held version-1 key, and computes HMAC-SHA-256 over UTF-8 `sem-caderno/session-csrf/v1`, one zero byte, and the exact decoded 32 bytes.
+- Raw evidence remains transient in the server derivation call. Application, persistence, contracts, database, logs, and errors receive no raw token or HMAC key.
+
+Persistence implementation:
+
+- `20260806000200-create-pre-session-challenges.ts` creates only `id`, `digest_version`, `challenge_digest`, `created_at`, `expires_at`, nullable `consumed_at`, and `version` in `sem_caderno.pre_session_challenges`.
+- Named checks require digest version 1, exact 32-byte digest, expiry after creation, consumption within `[created_at, expires_at)`, and positive version. The unique version/digest constraint is the only current lookup index.
+- `PostgresPreSessionChallengeAdapter` owns direct parameterized creation and consumption. The guarded update increments version and permits one winner only when the challenge exists, is unconsumed, and the explicit consumption instant is before expiry and not before creation.
+- Unknown, expired, equal-expiry, already-consumed, and wrong-digest evidence return the same negative internal result. Digest decoding, connection, query, and persistence failures reject and never become rejection outcomes.
+- The future complete issuance adapter must embed challenge consumption in the accepted atomic sign-in transaction. Cycle 026 does not implement or weaken that transaction boundary.
+
+Files and tests:
+
+- Production source adds the application challenge boundary/use case, server digest derivation, direct PostgreSQL adapter/export, and one ordered migration.
+- Focused application tests prove exact lifetime, deterministic explicit-time handling, non-mutation, rejection, and failure separation. Server tests prove a fixed digest known answer, domain separation, strict malformed rejection, and redacted HMAC configuration failure.
+- Real PostgreSQL 18.4 tests prove exact columns, ordered checksums, constraints, digest-only creation, active consumption, replay/expiry/equality rejection, one winner among eight concurrent consumers, and closed-pool failure. Existing migration inventories now include all five ordered migrations.
+- No dependency, manifest, workspace configuration, lockfile, historical migration, database runner, or architecture-rule change was required.
+
+Security, privacy, and overengineering:
+
+- No raw CSRF evidence, User/Business identity, origin, IP, user agent, device/fingerprint/location data, request/login history, arbitrary metadata, analytics, telemetry, or authorization cache is persisted.
+- Infrastructure faults remain errors. The consumption predicate gives persistence-layer single-use/replay protection without claiming HTTP origin validation, complete CSRF enforcement, or transaction-wide sign-in atomicity.
+- Retained one application port/use case, one server derivation function, one direct adapter, and one table. Rejected CSPRNG issuance, generic token/digest framework, repository base, Unit of Work, transaction framework, cleanup service/index, request context, clock framework, middleware, event/audit framework, and policy engine.
+
+Ralph loop and validation:
+
+- Two meaningful implementation/validation iterations were used. Iteration 1 implemented the slice; application/package builds, 25 application tests, 9 focused server derivation tests, 7 focused real-PostgreSQL challenge tests, and architecture validation passed without a production correction. The final evidence audit then found that one migration-test title claimed positive/supported version constraints without exercising them. Iteration 2 added those missing PostgreSQL assertions; production behavior and the seven-test count were unchanged, and the affected plus aggregate gates passed.
+- The ambient shell initially selected Node 20.20.2, Corepack 0.35.0, and pnpm 9.15.0. That failed the runtime preflight before implementation; all accepted executable evidence uses the repository-pinned Node 24.19.0, Corepack 0.35.0, and pnpm 11.20.0 path.
+- Frozen offline installation passed without manifest or lockfile change. Documentation validation covered 63 Markdown files, 375 local links, and 108 tables; formatting, ESLint, every workspace type-check, seven-workspace architecture validation over 55 modules/52 dependencies, and the controlled validator self-test passed.
+- The complete suite passed 207 tests: 81 contract, 25 application, 71 server, and 30 real-PostgreSQL persistence tests. Contracts, domain, application, persistence, server, database tooling, and the neutral Next.js application built; five ordered migration sources and checksums passed static validation.
+- The complete root validation passed before cleanup and again after `pnpm run clean` removed reproducible TypeScript, Next.js, declaration, and test output. Final focused security, raw-evidence, secret, SQL, dependency, export, draft-marker, forbidden-artifact, container, diff, and repository-state inspections passed; generated output was cleaned again before closure.
+
+Deferred and not applicable:
+
+- Sign-in rate limiting, complete issuance transaction, session/authenticated-CSRF migration, CSPRNG generation, ID00/ID04 Fastify routes, cookie writing, final CSRF enforcement, authorization/Membership, Business switching, product API/UI, mobile, provider, telemetry, deployment, retention cleanup, and merchant user testing remain deliberately deferred.
+- Browser/mobile/provider/deployment/accessibility/product-validation and merchant-testing gates are not applicable because no merchant-facing behavior exists.
+
+Recommended next cycle:
+
+Cycle 027 — Sign-In Rate-Limit Persistence Foundation.
+
+Recommended next task:
+
+Task 001 — Implement Account-Keyed Aggregate Failure Tracking and Clearing Boundaries.
+
+Objective:
+
+Implement only the accepted versioned normalized-identity HMAC derivation and bounded PostgreSQL aggregate needed to record, evaluate, and clear the 10-failures-per-15-minutes sign-in limit before atomic session issuance.
+
+Why next:
+
+Password verification and pre-session challenge persistence are now real. The remaining independent persistence prerequisite named by the accepted sign-in transaction is aggregate account-keyed rate state; implementing it next keeps failure accounting testable before combining it with session/authenticated-CSRF issuance.
+
+Explicit non-goals:
+
+- No complete sign-in coordinator or transaction, session/authenticated-CSRF migration, CSPRNG session issuance, ID00/ID04 Fastify route, cookie writing, authorization, IP/device tracking, attempt history, product UI, provider, deployment, or merchant user testing.

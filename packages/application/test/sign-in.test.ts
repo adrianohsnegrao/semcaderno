@@ -1,13 +1,17 @@
 import {
+  createPreSessionChallenge,
   normalizePrimaryEmail,
   type AuthenticatedCsrfDigest,
+  type ConsumePreSessionChallengeInput,
   type IssueSessionInput,
   type IssuedSession,
   type PasswordVerificationPort,
   type PasswordVerificationResult,
+  type PreSessionChallengePort,
   type PreSessionCsrfDigest,
   type SessionCredentialDigest,
   type SessionIssuanceTransactionPort,
+  type StorePreSessionChallengeInput,
   type VerifyPasswordInput,
 } from '../src/index.js';
 
@@ -71,6 +75,90 @@ describe('password verification application port', () => {
     expect({ outcome: 'invalid' } satisfies PasswordVerificationResult).toEqual({
       outcome: 'invalid',
     });
+  });
+});
+
+describe('pre-session challenge application boundary', () => {
+  const challengeDigest = Object.freeze({
+    digestVersion: 1,
+    digestBase64Url: 'ggggggggggggggggggggggggggggggggggggggggggg',
+  }) as PreSessionCsrfDigest;
+
+  it('derives the exact ten-minute expiry from one explicit creation instant', async () => {
+    const createdAt = new Date('2026-08-06T12:00:00Z');
+    const calls: StorePreSessionChallengeInput[] = [];
+    const challenges: PreSessionChallengePort = {
+      create(input) {
+        calls.push(input);
+        return Promise.resolve();
+      },
+      consume() {
+        return Promise.resolve(false);
+      },
+    };
+
+    await expect(
+      createPreSessionChallenge(challenges).execute({ challengeDigest, createdAt }),
+    ).resolves.toEqual({ expiresAt: new Date('2026-08-06T12:10:00Z') });
+    expect(calls).toEqual([
+      {
+        challengeDigest,
+        createdAt: new Date('2026-08-06T12:00:00Z'),
+        expiresAt: new Date('2026-08-06T12:10:00Z'),
+      },
+    ]);
+    expect(calls[0]?.createdAt).not.toBe(createdAt);
+    expect(createdAt.toISOString()).toBe('2026-08-06T12:00:00.000Z');
+  });
+
+  it('rejects an invalid creation instant before persistence', async () => {
+    const calls: StorePreSessionChallengeInput[] = [];
+    const challenges: PreSessionChallengePort = {
+      create(input) {
+        calls.push(input);
+        return Promise.resolve();
+      },
+      consume() {
+        return Promise.resolve(false);
+      },
+    };
+
+    await expect(
+      createPreSessionChallenge(challenges).execute({
+        challengeDigest,
+        createdAt: new Date(Number.NaN),
+      }),
+    ).rejects.toThrow('Pre-session challenge creation instant is invalid.');
+    expect(calls).toEqual([]);
+  });
+
+  it('keeps rejection and infrastructure failure distinct at the consumption port', async () => {
+    const consumedAt = new Date('2026-08-06T12:05:00Z');
+    const input: ConsumePreSessionChallengeInput = Object.freeze({
+      challengeDigest,
+      consumedAt,
+    });
+    const failure = new Error('synthetic challenge infrastructure failure');
+    const rejected: PreSessionChallengePort = {
+      create() {
+        return Promise.resolve();
+      },
+      consume(received) {
+        expect(received).toBe(input);
+        return Promise.resolve(false);
+      },
+    };
+    const failed: PreSessionChallengePort = {
+      create() {
+        return Promise.resolve();
+      },
+      consume() {
+        return Promise.reject(failure);
+      },
+    };
+
+    await expect(rejected.consume(input)).resolves.toBe(false);
+    await expect(failed.consume(input)).rejects.toBe(failure);
   });
 });
 
