@@ -132,8 +132,8 @@ describe('password credential migration', () => {
          INNER JOIN sem_caderno.schema_migration_checksums AS checksum USING (name)
         ORDER BY history.id`,
     );
-    expect(applied.rows).toHaveLength(5);
-    expect(applied.rows.at(-1)?.name).toBe('20260806000200-create-pre-session-challenges');
+    expect(applied.rows).toHaveLength(6);
+    expect(applied.rows.at(-1)?.name).toBe('20260806000300-create-sign-in-rate-limits');
     expect(applied.rows.every((row) => /^[a-f0-9]{64}$/.test(row.checksum))).toBe(true);
   });
 

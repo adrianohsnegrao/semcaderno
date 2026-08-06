@@ -3423,3 +3423,49 @@ Cycle 027 resolves the only authority blocker that prevented the persistence sli
 Explicit non-goals:
 
 - No complete sign-in coordinator or transaction, session/authenticated-CSRF migration, CSPRNG session issuance, ID00/ID04 Fastify route, cookie writing, authorization, IP/device tracking, attempt history, product UI, provider, deployment, or merchant user testing.
+
+## Cycle 028 — Sign-In Rate-Limit Persistence Foundation
+
+### Task 001 — Implement Account-Keyed Aggregate Failure Tracking and Clearing Boundaries
+
+Status: complete at implementation level; pending review and Git checkpoint.
+
+Implemented scope:
+
+- Added the application-owned purpose-branded account key, allowed/limited decision, explicit check/record-failure inputs, idempotent clear input, and `SignInRateLimitPort`. The port exposes no count, database type, raw identity, or HMAC key.
+- Added the server-only version-1 HMAC derivation using the existing normalized-email authority, server session HMAC key, exact UTF-8 rate domain, one zero separator, and complete canonical 32-byte digest representation.
+- Added the sixth ordered migration for one compound-keyed `sign_in_rate_limits` aggregate with exact fixed-window, count, chronology, retention, and version constraints plus one cleanup index.
+- Added `PostgresSignInRateLimitAdapter` with transaction-scoped per-key advisory serialization, row locking, non-mutating checks, atomic creation/increment/saturation/expiry replacement, idempotent clear, temporal-regression rejection, and bounded explicit-time cleanup.
+- Added focused application and server tests plus real PostgreSQL 18.4 schema, lifecycle, cleanup, failure, and deterministic concurrency coverage. No account identifier, attempt ledger, password evidence, IP, device, agent, request history, or telemetry is stored.
+
+Validation evidence:
+
+- Pinned runtime and frozen offline dependency installation passed with no manifest or lockfile change.
+- Focused suites passed 27 application tests, 3 account-key tests, and 13 real-PostgreSQL rate-limit tests. The complete repository validation passes 225 tests: 81 contract, 27 application, 74 server, and 43 persistence tests.
+- Six ordered migration sources/checksums, formatting, documentation, lint, all workspace type-checks/builds, architecture validation/self-test, and clean-state validation pass.
+- The bounded Ralph loop used three meaningful iterations. The first PostgreSQL run exposed test-state contamination in bounded-cleanup evidence; the second isolated the table per test and passed without changing production behavior. The final evidence audit then added forced check-before-record and record-before-check threshold ordering, which passed without a production correction.
+
+Deferred and not applicable:
+
+- Complete sign-in orchestration/transaction, session and authenticated-CSRF evidence generation/persistence, collision retries, ID00/ID04 Fastify routes, cookies, final CSRF enforcement, authorization/Membership, product API/UI, mobile, provider, telemetry, deployment scheduling, and merchant testing remain deliberately deferred.
+- Browser/mobile/provider/deployment/accessibility/product-validation and merchant-testing gates are not applicable because no merchant-facing behavior exists.
+
+Recommended next cycle:
+
+Cycle 029 — Session and Authenticated-CSRF Evidence Generation Foundation.
+
+Recommended next task:
+
+Task 001 — Implement Independent CSPRNG Evidence Generation and Versioned Digest Derivation.
+
+Objective:
+
+Implement the already-specified server-owned generation of independent fresh `v1` session and `c1` authenticated-CSRF evidence and their purpose-separated version-1 digests, without persistence, sign-in orchestration, or HTTP.
+
+Why next:
+
+Password verification, pre-session challenge persistence, and rate-limit persistence are executable. Fresh session/authenticated-CSRF evidence is the smallest remaining independent input required by the later atomic issuance transaction and is fully specified without requiring schema or HTTP decisions.
+
+Explicit non-goals:
+
+- No complete sign-in coordinator or transaction, session/authenticated-CSRF migration, collision retry orchestration, session insertion, ID00/ID04 Fastify route, cookie writing, CSRF enforcement, authorization, product UI, provider, deployment, or merchant user testing.

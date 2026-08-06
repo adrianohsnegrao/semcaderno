@@ -55,6 +55,7 @@ export interface PasswordVerificationPort {
 declare const sessionCredentialDigestBrand: unique symbol;
 declare const preSessionCsrfDigestBrand: unique symbol;
 declare const authenticatedCsrfDigestBrand: unique symbol;
+declare const signInRateLimitAccountKeyBrand: unique symbol;
 
 export type SessionCredentialDigest = Readonly<{
   digestVersion: 1;
@@ -73,6 +74,35 @@ export type AuthenticatedCsrfDigest = Readonly<{
   digestBase64Url: string;
   readonly [authenticatedCsrfDigestBrand]: true;
 }>;
+
+export type SignInRateLimitAccountKey = Readonly<{
+  digestVersion: 1;
+  digestBase64Url: string;
+  readonly [signInRateLimitAccountKeyBrand]: true;
+}>;
+
+export type SignInRateLimitDecision =
+  Readonly<{ outcome: 'allowed' }> | Readonly<{ outcome: 'limited'; retryAt: Date }>;
+
+export type CheckSignInRateLimitInput = Readonly<{
+  accountKey: SignInRateLimitAccountKey;
+  evaluatedAt: Date;
+}>;
+
+export type RecordSignInRateLimitFailureInput = Readonly<{
+  accountKey: SignInRateLimitAccountKey;
+  occurredAt: Date;
+}>;
+
+export type ClearSignInRateLimitInput = Readonly<{
+  accountKey: SignInRateLimitAccountKey;
+}>;
+
+export interface SignInRateLimitPort {
+  check(input: CheckSignInRateLimitInput): Promise<SignInRateLimitDecision>;
+  recordFailure(input: RecordSignInRateLimitFailureInput): Promise<SignInRateLimitDecision>;
+  clear(input: ClearSignInRateLimitInput): Promise<void>;
+}
 
 export type CreatePreSessionChallengeInput = Readonly<{
   challengeDigest: PreSessionCsrfDigest;

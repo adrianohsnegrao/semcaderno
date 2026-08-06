@@ -2,6 +2,8 @@ export {
   createPreSessionChallenge,
   normalizePrimaryEmail,
   type AuthenticatedCsrfDigest,
+  type CheckSignInRateLimitInput,
+  type ClearSignInRateLimitInput,
   type ConsumePreSessionChallengeInput,
   type CreatedPreSessionChallenge,
   type CreatePreSessionChallenge,
@@ -15,7 +17,11 @@ export {
   type PreSessionCsrfDigest,
   type SessionCredentialDigest,
   type SessionIssuanceTransactionPort,
+  type SignInRateLimitAccountKey,
+  type SignInRateLimitDecision,
+  type SignInRateLimitPort,
   type StorePreSessionChallengeInput,
+  type RecordSignInRateLimitFailureInput,
   type VerifyPasswordInput,
 } from './sign-in.js';
 export {

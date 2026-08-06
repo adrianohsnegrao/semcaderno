@@ -148,6 +148,7 @@ describe('session migration foundation', () => {
       'schema_migration_checksums',
       'schema_migrations',
       'sessions',
+      'sign_in_rate_limits',
       'user_password_credentials',
       'users',
     ]);
@@ -158,7 +159,7 @@ describe('session migration foundation', () => {
          INNER JOIN sem_caderno.schema_migration_checksums AS checksum USING (name)
         ORDER BY history.id`,
     );
-    expect(applied.rows).toHaveLength(5);
+    expect(applied.rows).toHaveLength(6);
     expect(applied.rows.every((row) => /^[a-f0-9]{64}$/.test(row.checksum))).toBe(true);
 
     const userId = await insertUser();

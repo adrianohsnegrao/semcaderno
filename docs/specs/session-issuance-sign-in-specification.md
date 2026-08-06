@@ -478,12 +478,18 @@ This standalone lifecycle boundary does not replace the accepted atomic issuance
 
 Cycle 027 closes the previously blocked rate-limit authority without production code. It selects an explicit fixed-start aggregate window instead of inaccurately calling the minimal state an exact rolling window; defines threshold, counted outcomes, read/record/clear results, temporal ordering, retention, and concurrency; and fixes the version-1 normalized-email HMAC framing. No application port, server digester, adapter, SQL, migration, dependency, or PostgreSQL test is added by this specification closure.
 
-## 23. Recommended Next Cycle
+## 23. Cycle 028 Rate-Limit Persistence Implementation Profile
 
-**Cycle 028 - Sign-In Rate-Limit Persistence Foundation**
+Cycle 028 implements `SignInRateLimitPort`, the exact server-owned version-1 account-key HMAC derivation, and `PostgresSignInRateLimitAdapter`. The adapter validates canonical digest-only input, uses explicit times, and serializes each key with a transaction-scoped advisory lock plus row locking. It creates, increments, saturates without mutation, replaces expired windows, checks, and clears exactly as specified; infrastructure and temporal-order faults reject.
 
-**Task 001 - Implement Account-Keyed Aggregate Failure Tracking and Clearing Boundaries**
+The sixth ordered migration creates only the compound-keyed aggregate, exact lifecycle/count constraints, positive version, and retention cleanup index. Bounded cleanup accepts explicit time and limit but has no scheduler. Focused real PostgreSQL tests prove migration integrity, equality boundaries, no lost increments, cap 10, atomic expiry replacement, and both forced clear/record orderings. No sign-in coordinator, CSPRNG evidence generation, session insertion, authenticated-CSRF persistence, HTTP, cookie, or authorization behavior is added.
 
-Objective: implement only the accepted versioned normalized-identity HMAC derivation and bounded PostgreSQL aggregate needed to record, evaluate, and clear the 10-failures-per-15-minutes sign-in limit before atomic session issuance.
+## 24. Recommended Next Cycle
 
-Explicit non-goals: no complete sign-in coordinator or transaction, session/authenticated-CSRF migration, CSPRNG session issuance, ID00/ID04 Fastify route, cookie writing, authorization, IP/device tracking, attempt history, product UI, provider, deployment, or merchant testing.
+**Cycle 029 - Session and Authenticated-CSRF Evidence Generation Foundation**
+
+**Task 001 - Implement Independent CSPRNG Evidence Generation and Versioned Digest Derivation**
+
+Objective: implement the server-owned generation of fresh independent `v1` session and `c1` authenticated-CSRF evidence plus the already-specified purpose-separated digest derivation, without persistence or HTTP orchestration.
+
+Explicit non-goals: no complete sign-in coordinator or transaction, session/authenticated-CSRF migration, collision retry orchestration, session insertion, ID00/ID04 Fastify route, cookie writing, authorization, product UI, provider, deployment, or merchant testing.

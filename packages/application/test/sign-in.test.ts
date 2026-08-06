@@ -2,6 +2,8 @@ import {
   createPreSessionChallenge,
   normalizePrimaryEmail,
   type AuthenticatedCsrfDigest,
+  type CheckSignInRateLimitInput,
+  type ClearSignInRateLimitInput,
   type ConsumePreSessionChallengeInput,
   type IssueSessionInput,
   type IssuedSession,
@@ -11,7 +13,11 @@ import {
   type PreSessionCsrfDigest,
   type SessionCredentialDigest,
   type SessionIssuanceTransactionPort,
+  type SignInRateLimitAccountKey,
+  type SignInRateLimitDecision,
+  type SignInRateLimitPort,
   type StorePreSessionChallengeInput,
+  type RecordSignInRateLimitFailureInput,
   type VerifyPasswordInput,
 } from '../src/index.js';
 
@@ -75,6 +81,67 @@ describe('password verification application port', () => {
     expect({ outcome: 'invalid' } satisfies PasswordVerificationResult).toEqual({
       outcome: 'invalid',
     });
+  });
+});
+
+describe('sign-in rate-limit application port', () => {
+  const accountKey = Object.freeze({
+    digestVersion: 1,
+    digestBase64Url: 'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
+  }) as SignInRateLimitAccountKey;
+
+  it('preserves explicit allowed and limited decisions without exposing the count', async () => {
+    const evaluatedAt = new Date('2026-08-06T12:00:00Z');
+    const retryAt = new Date('2026-08-06T12:15:00Z');
+    const checkInput: CheckSignInRateLimitInput = Object.freeze({ accountKey, evaluatedAt });
+    const failureInput: RecordSignInRateLimitFailureInput = Object.freeze({
+      accountKey,
+      occurredAt: evaluatedAt,
+    });
+    const clearInput: ClearSignInRateLimitInput = Object.freeze({ accountKey });
+    const limited: SignInRateLimitDecision = Object.freeze({ outcome: 'limited', retryAt });
+    const calls: string[] = [];
+    const rateLimit: SignInRateLimitPort = {
+      check(input) {
+        expect(input).toBe(checkInput);
+        calls.push('check');
+        return Promise.resolve({ outcome: 'allowed' });
+      },
+      recordFailure(input) {
+        expect(input).toBe(failureInput);
+        calls.push('recordFailure');
+        return Promise.resolve(limited);
+      },
+      clear(input) {
+        expect(input).toBe(clearInput);
+        calls.push('clear');
+        return Promise.resolve();
+      },
+    };
+
+    await expect(rateLimit.check(checkInput)).resolves.toEqual({ outcome: 'allowed' });
+    await expect(rateLimit.recordFailure(failureInput)).resolves.toBe(limited);
+    await expect(rateLimit.clear(clearInput)).resolves.toBeUndefined();
+    expect(calls).toEqual(['check', 'recordFailure', 'clear']);
+    expect(Object.keys(limited)).toEqual(['outcome', 'retryAt']);
+    expect('failureCount' in limited).toBe(false);
+    expect(evaluatedAt.toISOString()).toBe('2026-08-06T12:00:00.000Z');
+  });
+
+  it('keeps check, record, and clear infrastructure failures distinct from decisions', async () => {
+    const failure = new Error('synthetic rate-limit infrastructure failure');
+    const rateLimit: SignInRateLimitPort = {
+      check: () => Promise.reject(failure),
+      recordFailure: () => Promise.reject(failure),
+      clear: () => Promise.reject(failure),
+    };
+    const instant = new Date('2026-08-06T12:00:00Z');
+
+    await expect(rateLimit.check({ accountKey, evaluatedAt: instant })).rejects.toBe(failure);
+    await expect(rateLimit.recordFailure({ accountKey, occurredAt: instant })).rejects.toBe(
+      failure,
+    );
+    await expect(rateLimit.clear({ accountKey })).rejects.toBe(failure);
   });
 });
 
