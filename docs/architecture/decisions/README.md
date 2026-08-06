@@ -70,17 +70,17 @@ Specification, implementation, validation, or future decision work created by th
 - [ADR 0032: Enforce Workspace Boundaries with Layered Static Checks](0032-layered-static-architecture-enforcement.md)
 - [ADR 0033: Use Zod as the Executable Transport Source and Derive Types and OpenAPI](0033-zod-contract-source-types-openapi-derived.md)
 - [ADR 0034: Use Explicit Session Evidence with Keyed Digest Resolution](0034-explicit-session-evidence-keyed-digest-resolution.md)
+- [ADR 0035: Use Local Email-Password Verification with Split Session and CSRF Issuance](0035-local-email-password-session-csrf-issuance.md)
 
 ## Open Decisions
 
-- Authentication library or credential provider within the application-owned session boundary.
+- Exact maintained Argon2id package/version and native supply-chain profile for the accepted local verifier.
 - Product photo storage provider and access pattern.
 - Deployment target and production infrastructure.
 - PostgreSQL Row-Level Security remains deferred defense in depth; adoption and policy mechanics require later threat-tested evidence.
 - Fractional quantity scale and rounding mode if fractional quantities are required.
-- Exact sign-in credential method and password policy.
 - Email delivery provider.
-- Session/challenge durations, HMAC key rotation/cutover, cleanup/retention, issuance, CSRF, and revocation-command implementation under ADR 0034.
+- Session/HMAC key rotation/cutover, cleanup/retention, sign-out/revocation commands, and protected-operation CSRF implementation under ADRs 0034-0035.
 - OpenAPI generator selection, cursor encoding, and correlation-header spelling.
 - Cache, queue/broker, outbox dispatcher, and derived-projection implementation details.
 - Backup vendor, restore procedure, and operational recovery targets.

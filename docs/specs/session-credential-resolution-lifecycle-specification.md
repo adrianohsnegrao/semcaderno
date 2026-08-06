@@ -535,4 +535,10 @@ The future server route reads only production cookie `__Host-sem-caderno-session
 
 The route is `GET /api/v1/session`, returns the stable Cycle 016 response with `Cache-Control: no-store`, and emits no cookie, CSRF token, accessible-Business list, or authorization fact. Missing/unusable evidence stays anonymous; infrastructure failures become safe 500 Problem Details. ID05 is a safe read and needs no CSRF token, while all unsafe browser operations retain ADR 0023 protection.
 
-Cookie issuance duration, write/clear behavior, key rotation, login/logout, CSRF token lifecycle, authorization, retention, deployment secret management, and production listener configuration remain deliberate later work.
+At the Cycle 021 checkpoint, cookie issuance duration, write/clear behavior, key rotation, login/logout, CSRF token lifecycle, authorization, retention, deployment secret management, and production listener configuration remained deliberate later work. Cycle 023 closes only the issuance duration, successful cookie write, and CSRF lifecycle in the following profile; the other items remain deferred.
+
+## 26. Cycle 023 Issuance Profile
+
+Cycle 023 closes the issuance-side authority in the separate [Session Issuance and Sign-In Specification](session-issuance-sign-in-specification.md) without changing current-session resolution. A successful ID04 operation creates a fresh version 1 credential, persists only its existing HMAC lookup representation, and uses one explicit issuance instant to establish a fixed 12-hour absolute expiry. It never adopts the incoming credential and atomically revokes only the prior session represented by the strictly parsed configured cookie.
+
+New sessions start with no selected Business. Independent authenticated CSRF evidence is bound to the new session by a distinct keyed digest and expires with it. The current-session resolver still receives only lookup evidence and `evaluatedAt`; it does not verify passwords, generate evidence, authorize Business access, or return CSRF material. No production issuance, migration, cookie write, or CSRF enforcement is implemented by Cycle 023.

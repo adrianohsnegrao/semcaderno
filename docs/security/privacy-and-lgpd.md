@@ -197,7 +197,7 @@ Requirements for future implementation planning:
 
 ## Required Future Specifications
 
-- Concrete session expiry durations, token/digest generation, key rotation, cleanup, and revocation implementation.
+- Session/HMAC key rotation, cleanup/retention, logout/revocation implementation, and deployment secret management. Cycle 023 closes initial session/CSRF generation and the fixed 12-hour issuance lifetime.
 - Credential reset and support recovery policy.
 - Derived or mechanically checked OpenAPI 3.2 output from the accepted Zod contract source when a generator is selected.
 - Remaining physical migrations and tenant-enforcement repositories beyond the Cycle 019 identity/session foundation.
@@ -268,5 +268,15 @@ The server-local loader requires `SEM_CADERNO_SESSION_HMAC_KEY_V1_BASE64URL`, de
 Read-only `GET /api/v1/session` captures one explicit operation instant and returns `Cache-Control: no-store`. Missing, malformed, duplicate, unknown, revoked, expired, equal-expiry, or disabled-User evidence shares one anonymous 200 result. Crypto, application, PostgreSQL, decoding, mapping, and unexpected failures use safe 500 `INTERNAL_FAILURE` Problem Details with an independent correlation value; they never fail open as anonymous.
 
 ID05 returns no CSRF token and performs no state change, so it does not require a synchronizer token. ADR 0023 remains unchanged for login/bootstrap and every unsafe authenticated operation. Selected Business is returned only as remembered context and cannot replace current User, Business, Membership, capability, lifecycle, or same-Business checks. No IP address, user agent, device data, fingerprint, location, request history, login history, telemetry, arbitrary metadata, or authorization cache is authorized.
+
+## Sign-In and Session Issuance Security Boundary
+
+Cycle 023 selects strict normalized-email/password input and an application-owned verification boundary. The infrastructure verifier stores only Argon2id PHC strings with unique salts and performs equivalent hash work for unknown identities. Wrong password, unknown identity, disabled User, and absent credential binding share the same public `AUTHENTICATION_FAILED` result; correct proof is required before verification-required guidance. Passwords remain transient, are never logged or persisted raw, and never enter browser-safe contracts, audit, support, analytics, or telemetry.
+
+Successful sign-in uses independent CSPRNG calls for session and authenticated CSRF evidence. Only versioned domain-separated HMAC digests are persisted. A fresh session is inserted atomically with User revalidation, pre-session-CSRF consumption, prior presented-session revocation, minimal safe audit evidence, and rate-bucket clearing. The existing cookie is never adopted or repaired, no cookie is written before commit, and configuration, crypto, Argon2, database, transaction, mapping, or serialization failure cannot become invalid credentials or anonymous success.
+
+ID00 supplies a short-lived pre-session CSRF value in browser memory; ID04 requires it plus strict same-origin evidence. ID04 returns the independent authenticated CSRF value only in a no-store body, while the session credential remains only in the HttpOnly cookie. Unsafe authenticated operations must validate session, CSRF digest, Origin/Referer, Fetch Metadata where present, operation authorization, and input independently. CSRF proves neither identity nor Business access.
+
+The minimum future persistence stores credential verifiers, challenge/session/rate-limit digests, lifecycle timestamps, counts, and safe references only. IP address, user agent, device/fingerprint/location data, login or request history, raw bearer/password material, arbitrary metadata, and authorization caches remain prohibited. Session, CSRF, identity-digest, and User associations are security-sensitive even when not directly usable bearer values.
 
 Server tests use only fixed synthetic credential/key bytes and `.invalid` identity fixtures. The focused PostgreSQL HTTP suite uses an ephemeral container and removes its data. The implementation logs neither requests nor errors, emits only allow-listed Problem Details on failure, persists no new field, and introduces no tracking or telemetry.

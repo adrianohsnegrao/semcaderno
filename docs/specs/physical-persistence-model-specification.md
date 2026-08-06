@@ -911,3 +911,16 @@ The migration tool also owns `sem_caderno.schema_migrations` and `sem_caderno.sc
 `PostgresSessionResolutionAdapter` owns one parameterized statement. It receives digest version, decoded digest bytes, and explicit `evaluatedAt`; joins only the referenced usable User; and selects only User ID, absolute expiry, and nullable selected-Business context. It performs no Business/Membership authorization join, transaction, mutation, renewal, cleanup, or implicit current-time evaluation. Zero rows means no active session; query/connection/mapping failure remains failure.
 
 Real PostgreSQL 18.4 execution proves migration-from-zero, repeated migration execution, history/checksum evidence, UUIDv7 generation, exact table inventory, digest and lifecycle constraints, foreign keys, active/revoked/expired/equal-expiry handling, disabled User, selected Business context, and fail-closed database behavior. No other table in the 34-table catalogue is implemented by Cycle 019.
+
+## 37. Cycle 023 Future Sign-In Persistence Authority
+
+Cycle 023 authorizes no migration. The [Session Issuance and Sign-In Specification](session-issuance-sign-in-specification.md) narrows the future sign-in persistence work to four concrete needs:
+
+- one `user_password_credentials` row per User containing only the Argon2id PHC verifier, timestamps, and positive version;
+- short-lived `pre_session_challenges` containing only keyed digest/version, creation, expiry, optional consumption, and positive version;
+- required authenticated-CSRF digest/version evidence for newly issued `sessions`, introduced through a reviewed compatibility migration;
+- aggregate `sign_in_rate_limits` keyed by normalized-identity digest with window timestamps, count, expiry, and positive version, never attempt history.
+
+The issuance transaction must revalidate the User, consume the pre-session challenge, revoke only the prior presented session when present, insert the fresh digest-only session with null selected Business, record minimal safe audit evidence, and clear the aggregate rate bucket. It uses one explicit application-supplied issuance instant and no SQL current-time function. Exact migration names, compatibility/backfill mechanics, indexes, Argon package, and transaction implementation require implementation-cycle review.
+
+Raw password, raw session or CSRF evidence, HMAC key, IP address, user agent, device/location data, login/request history, arbitrary metadata, and authorization cache remain prohibited. The richer conceptual session catalogue predating Cycle 018 does not authorize idle timestamps, rotation chains, device hints, or revocation narratives for this first issuance slice.

@@ -170,12 +170,11 @@ Cycles 010 through 014 close the topology, language, runtime, web, server, valid
 - Future mobile Sale, Payment, Expense, and correction scope.
 - Customer duplicate-warning presentation; phone and email remain non-unique by accepted rule.
 - Business-local visible sale/payment numbering.
-- Exact authentication library or credential provider.
-- Exact sign-in credential method and password policy.
+- Exact maintained Argon2 implementation package/version and its reviewed build/supply-chain profile.
 - Email delivery provider.
-- Session issuance duration, key rotation/cutover, cleanup/retention, CSRF evidence, login/logout, and revocation-command implementation.
-- Session issuance, cookie duration/writing, logout/revocation commands, and protected-operation authorization remain separate from the implemented ID05 read boundary.
-- Exact resource DTOs, OpenAPI generator selection, cookie/CSRF token implementation, and correlation-header spelling.
+- Session/HMAC key rotation/cutover, cleanup/retention, login/logout/revocation commands, and deployment secret management.
+- Sign-in/session/CSRF implementation, protected-operation authorization, and Business switching remain separate from the implemented ID05 read boundary.
+- Exact remaining resource DTOs, OpenAPI generator selection, protected-operation CSRF enforcement, and correlation-header spelling.
 - Final responsive layouts, visual system, and concrete accessibility tooling.
 - Production migration environment safeguards, statement/lock timeouts, and backfill execution controls beyond the implemented history/checksum and advisory-lock baseline.
 
@@ -214,6 +213,14 @@ The server-local configuration loader accepts only the two fixed cookie profiles
 The handler captures one `Date` at entry and passes that same `evaluatedAt` inward. Success and failure responses are `Cache-Control: no-store`; ID05 emits no cookie, CSRF token, accessible-Business list, ETag, or authorization claim. Read-only inspection needs no CSRF token, while ADR 0023 remains mandatory for every unsafe authenticated operation. The [HTTP session evidence specification](../specs/http-session-evidence-configuration-specification.md) owns exact parsing, configuration, route, failure, test, and deferral details.
 
 Server injection tests prove strict configuration and evidence behavior, no-resolution malformed paths, stable responses, one explicit time, safe error redaction, and no cache/cookie leakage. A server-owned Testcontainers suite migrates PostgreSQL 18.4 from zero and proves active, unknown, revoked, and closed-pool behavior through the complete HTTP-to-adapter path. Raw SQL remains prohibited from server production code; only filename-scoped `apps/server/test/*.postgres.test.ts` fixture setup is allowed.
+
+## Session Issuance and Sign-In Architecture
+
+Cycle 023 selects local normalized-email/password verification for the initial MVP behind an application-owned verification port. PostgreSQL infrastructure owns Argon2id PHC retrieval and comparison; the application owns verification and issuance semantics but receives no HTTP, cookie, HMAC key, raw session evidence, or persistence row. Unknown identity, wrong password, disabled User, and missing credential binding remain one generic invalid-proof outcome; verifier and database failures remain infrastructure failures.
+
+The server security edge independently generates fresh opaque session, pre-session CSRF, and authenticated CSRF evidence with the accepted platform CSPRNG. Only raw session and CSRF values required by browser transport remain transient at that edge. Application and persistence receive versioned keyed digests and explicit times. One atomic issuance transaction revalidates the User, consumes the pre-session challenge, revokes only the prior presented session, inserts a fixed 12-hour session with null selected Business, records minimal safe audit evidence, and clears the aggregate rate bucket before any cookie is written.
+
+ID00 and ID04 remain future executable boundaries. ID04 writes the existing profile cookie only after commit and returns the independent authenticated CSRF value in a no-store body. Session creation authenticates only global User identity; future protected operations still revalidate Business, Membership, capability, lifecycle, and same-Business references. [ADR 0035](decisions/0035-local-email-password-session-csrf-issuance.md) and the [Session Issuance and Sign-In Specification](../specs/session-issuance-sign-in-specification.md) own the exact profile.
 
 ## Current Executable Baseline Non-Goals
 

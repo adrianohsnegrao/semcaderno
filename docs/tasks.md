@@ -3036,3 +3036,102 @@ Cycle 022 completes safe read-only session inspection. Issuing the inspected cre
 Explicit non-goals:
 
 - No production login/logout, credential storage or verification, session insertion, cookie writing, CSRF token implementation, authorization/Membership, Business switching, product API/UI, mobile, provider, telemetry, CI/deployment, or merchant user testing.
+
+## Cycle 023 — Session Issuance and Sign-In Specification
+
+### Task 001 — Define Credential Verification, Session Issuance, Cookie Lifetime, and Authenticated CSRF Token Lifecycle
+
+Status: Complete. The documentation and architecture authority required for a future narrow sign-in/session-issuance implementation is accepted; no production behavior was introduced.
+
+Objective:
+
+Define strict sign-in input and public outcomes, local credential-verification ownership, fresh session/CSRF issuance, fixed lifetime, atomic persistence, fixation resistance, cookie writing, abuse controls, failure boundaries, authorization separation, and focused future tests without implementing them.
+
+Authority and prerequisites:
+
+- `AGENTS.md`, the repository-local `sem-caderno-cycle` Skill, README, this task register, all 12 specifications, all accepted ADRs through 0034, architecture, security/privacy, test strategy, and Cycle 016/Cycles 017-022 session evidence were inspected before editing.
+- The Git baseline was independently verified on `main` at `53708d81f858ba0a2489b28b60e1deb2042139dd`, tracking matching `origin/main`, with one commit, a clean tree, and no generated output. Cycles 010-022 were present and Cycle 023 existed only as the accepted recommendation.
+- Cycle 022 preserves strict read-only ID05 behavior and the real PostgreSQL 18.4 HTTP path. Cycle 023 does not change that implementation.
+- Official NIST and OWASP password, session, and CSRF guidance was rechecked against repository authority. Repository semantics remain controlling.
+
+Specification decisions:
+
+- ID04 is `POST /api/v1/sessions` with a strict JSON object containing only normalized primary-email input and password. It requires ID00 pre-session CSRF evidence plus strict same-origin validation.
+- The application owns a narrow verification port. PostgreSQL infrastructure owns local Argon2id PHC retrieval/comparison. Password, transport, cookie, crypto, and database details do not enter application semantics.
+- Wrong password, unknown email, disabled User, and missing credential binding are one generic 401 `AUTHENTICATION_FAILED`; equivalent dummy Argon2 work reduces identity disclosure. Correct proof may distinguish an unverified email. Infrastructure failure remains 500 failure.
+- Future password creation requires at least 15 and supports at least 128 Unicode scalar values, with blocklist review and no composition/periodic-change rule. Sign-in accepts 1-128 scalars within its transport byte bound.
+- Successful verification independently generates a fresh `v1` session credential and `c1` authenticated CSRF token from 32 CSPRNG bytes each. Persistence receives only versioned domain-separated HMAC digests.
+- One explicit `issuedAt` owns transaction timestamps and fixed 12-hour absolute expiry. There is no idle/sliding expiry, renewal, remember-me, or refresh token.
+- One transaction revalidates the User, consumes the ID00 challenge, revokes only the prior presented session, inserts the fresh session with null selected Business, records minimal safe audit evidence, and clears aggregate rate state. Any failure rolls the entire issuance back.
+- Only a committed 201 writes the accepted production/local session cookie with `HttpOnly`, `SameSite=Lax`, `Path=/`, no `Domain`, `Max-Age=43200`, and matching `Expires`; production remains `Secure` and `__Host-` constrained.
+- ID00 returns a 10-minute in-memory `p1` CSRF token. ID04 returns the independent `c1` token in a no-store body. Unsafe authenticated operations later validate session, CSRF digest, origin evidence, Fetch Metadata when present, authorization, and input separately.
+- The minimum account-keyed abuse policy is 10 failures in a rolling 15 minutes using only a normalized-identity HMAC digest and bounded aggregate state. No IP, device, user-agent, or attempt history is stored.
+- Authentication establishes only global User context. Selected Business starts absent and never proves Membership, capability, tenant access, or authorization.
+
+Files created and updated:
+
+- Created `docs/specs/session-issuance-sign-in-specification.md` as the detailed Cycle 023 authority.
+- Created `docs/architecture/decisions/0035-local-email-password-session-csrf-issuance.md` for the durable local-password, split-evidence, explicit-time, and application-port decision.
+- Updated `README.md`, ADR index, architecture, application/identity/session/HTTP/transport/persistence specifications, security/privacy, test strategy, and this task register for traceability and stale-deferral correction.
+- No source, test, configuration, manifest, lockfile, database migration, SQL, generated artifact, or environment file changed.
+
+Persistence and future dependency implications:
+
+- No migration or schema change is implemented. Future authority permits only password-verifier, pre-session-challenge, session-CSRF, and aggregate sign-in-rate state reviewed in the implementation cycle.
+- No dependency or lockfile change occurs. The exact maintained Argon2 package/version remains an implementation-time supply-chain decision, not a product/security semantic gap.
+
+Security and privacy:
+
+- Password, raw session credential, raw CSRF evidence, HMAC key, and digests never enter logs, public errors, audit payloads, browser-safe contracts, analytics, telemetry, or support data.
+- Fresh evidence, atomic replacement, no pre-commit cookie, generic invalid proof, fail-closed infrastructure behavior, CSRF/origin layering, and no authorization inference address the current disclosure, fixation, replay, CSRF, and fail-open risks.
+- No IP, user agent, device/fingerprint/location data, login/request history, arbitrary metadata, or behavioral telemetry is authorized.
+
+Validation evidence:
+
+- `pnpm run check:runtime` passed twice with Node 24.19.0, Corepack 0.35.0, and pnpm 11.20.0. `pnpm run format` changed no executable file; `pnpm run format:check` passed before and after cleanup.
+- `pnpm run docs:check` passed before and after cleanup with 63 Markdown files, 376 local links, and 108 tables.
+- `pnpm run architecture` passed before and after cleanup: seven approved private workspaces, 43 modules, 40 dependencies, no dependency violation, and the controlled-invalid self-test.
+- `pnpm run clean` removed known reproducible outputs. Final scope, active-environment, draft-marker, credential/secret, generated/forbidden-artifact, trailing-whitespace, final-newline, Markdown, `git diff --check`, Cycle 024 boundary, and Git-state inspections passed.
+- Production lint, type-check, application/server/persistence tests, PostgreSQL, builds, browser/mobile/provider/deployment gates, and merchant testing were not applicable because no executable, dependency, manifest, lockfile, schema, migration, or runtime behavior changed.
+
+Initial failures and corrections:
+
+- Two combined manual `apply_patch` attempts failed atomically because one hunk was malformed and one persistence anchor differed; neither changed a file. Smaller verified patches applied the same reviewed documentation edits.
+- The first combined hygiene command stopped after all preceding checks passed because it assumed `rg -c` prints `0` for no Cycle 024 heading. `rg` emitted no text with exit 1 for the valid no-match case; the corrected explicit no-match branch passed and confirmed Cycle 024 was not started.
+
+ADR assessment:
+
+- ADR 0035 is required because Cycle 023 selects a durable local email/password verification boundary over provider-managed or transport-owned alternatives and divides raw session/CSRF generation from application and persistence authority. Exact fields, durations, limits, mappings, and tests remain in the specification rather than the ADR.
+
+Overengineering assessment:
+
+- Accepted only one local verifier boundary, one issuance operation, two distinct CSRF/session evidence classes, one explicit time, one transaction boundary, and bounded aggregate abuse state because each closes a concrete implementation blocker.
+- Rejected provider/plugin frameworks, generic token/credential/session/CSRF abstractions, hash-strategy registries, request contexts, AsyncLocalStorage, DI/service location, clock frameworks, generic repositories/transactions, refresh-token/session-family/device systems, event buses, policy engines, telemetry, and speculative rotation infrastructure.
+
+Explicit non-goals:
+
+- No production sign-in, verifier, password migration, session insertion, CSPRNG use, cookie writer, ID00/ID04 route, logout, registration, reset, CSRF middleware, authorization, Membership lookup, Business switching, product API/UI, mobile, provider, telemetry, deployment, JWT/OAuth/refresh token, runtime dependency, migration, SQL, commit, push, branch, or pull request.
+
+User-testing status:
+
+- Not applicable. Cycle 023 adds no merchant-facing behavior, UI, browser journey, usability claim, or accessibility-conformance claim.
+
+Recommended next cycle:
+
+Cycle 024 — Sign-In Contract and Application Boundary Implementation.
+
+Recommended next task:
+
+Task 001 — Implement ID00/ID04 Transport Schemas, Email Normalization, Password-Verification Port, and Digest-Only Session-Issuance Ports.
+
+Objective:
+
+Implement only the reviewed browser-safe ID00/ID04 schemas and framework-independent application input/output ports needed for verification and digest-only issuance, with focused contract/application tests and no infrastructure adapter or HTTP exposure.
+
+Why next:
+
+Cycle 023 closes all semantic inputs for the inner boundary. Establishing executable transport and application ownership before choosing Argon packaging, migrations, transactions, or Fastify writing preserves the repository's inside-out sequence and keeps raw credential generation at the future server edge.
+
+Explicit non-goals:
+
+- No Argon2 dependency or password adapter, migration, SQL, session insertion, rate-limit store, crypto evidence generation, Fastify ID00/ID04 route, cookie writing, CSRF enforcement, login UI, logout, authorization/Membership, Business switching, product behavior, mobile, provider, telemetry, deployment, or merchant user testing.

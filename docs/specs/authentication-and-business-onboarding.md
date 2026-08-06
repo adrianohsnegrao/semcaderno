@@ -218,7 +218,7 @@ Initial Owner safeguards:
 
 ### 10.1 Sign-In Identifier
 
-The MVP conceptual sign-in identifier is normalized email. Password-based authentication is the likely MVP direction, but the exact mechanism remains an implementation decision.
+The initial MVP sign-in method is normalized primary email plus a locally verified password. The exact request, verification, issuance, cookie, CSRF, failure, and test profile is authoritative in the [Session Issuance and Sign-In Specification](session-issuance-sign-in-specification.md).
 
 Errors must avoid account enumeration. A failed sign-in response should not reveal whether the email exists, is unverified, has no active memberships, or has only suspended memberships. Follow-up flows may provide safe guidance after the user proves control of the email.
 
@@ -724,11 +724,9 @@ Rejected for MVP:
 
 Deferred:
 
-- Exact authentication library or managed identity provider.
-- Exact password policy and hashing implementation.
+- Exact maintained Argon2 implementation package and version, subject to implementation-time supply-chain review.
 - Email delivery provider.
 - SMS and phone verification.
-- Cookie, token, or session storage format.
 - User-managed device list and individual device revocation.
 - Ownership transfer workflow.
 - Business reactivation workflow.
@@ -743,19 +741,16 @@ Product validation:
 - Should Staff be allowed to record expenses?
 - Should Staff view "Quanto sobrou este mês" or only operational views?
 - Which user-facing terms are clearest: "Dono" versus "Responsavel", and "Atendente" versus "Funcionario"?
-- What session duration is acceptable on shared counter devices?
+- Whether merchant evidence later justifies changing the accepted fixed 12-hour session lifetime on shared counter devices.
 - Do early merchants expect phone-based recovery?
 
 Deferred implementation decisions:
 
-- Authentication library or managed identity provider.
-- Password-based implementation details or alternative credential method.
+- Exact maintained Argon2 implementation package and version.
 - Email delivery provider.
-- Session storage mechanism.
-- Cookie/token format.
 - ORM and persistence schema.
 - API framework.
-- Rate-limiting implementation.
+- Deployment-level distributed abuse controls beyond the accepted identity-keyed minimum.
 - Audit storage implementation.
 
 ### Cycle 017 implementation-readiness finding
@@ -763,6 +758,12 @@ Deferred implementation decisions:
 Cycle 017 confirmed that server-side persistence and revocation are required, but a real current-session adapter is not yet authorized. The accepted documents do not specify how the opaque browser session identifier becomes request-scoped lookup evidence for the no-input `CurrentSessionStatePort`, how the raw value is converted to the stored keyed digest, or which boundary owns the digest key and version selection.
 
 The documents also do not close the effective expiry exposed when idle and absolute endpoints coexist, deterministic current-time ownership, or whether missing, revoked, expired, disabled-User, and invalid remembered-Business evidence resolves to anonymous inspection, a stable application rejection, or another state. These are security semantics, not ordinary repository details. They require a narrow specification before session SQL, migration, adapter, or Fastify composition is implemented.
+
+### Cycle 023 sign-in and issuance profile
+
+Cycle 023 closes the initial returning-User authentication profile in the [Session Issuance and Sign-In Specification](session-issuance-sign-in-specification.md). ID04 uses strict normalized-email/password input, an application-owned verification boundary, infrastructure-owned Argon2id comparison, generic invalid-proof behavior, and a fresh fixed 12-hour server session. It never derives Business access from authentication.
+
+Successful sign-in generates independent opaque session and authenticated CSRF evidence, persists only keyed digests, starts with no selected Business, atomically replaces only the prior session presented by this browser, and writes the already accepted cookie profile only after commit. ID00 owns short-lived pre-session CSRF evidence. Credential issuance, password verification, schema changes, cookie writing, and CSRF enforcement remain unimplemented production work.
 
 ## 25. Acceptance Criteria
 

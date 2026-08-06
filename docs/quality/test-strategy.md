@@ -284,3 +284,22 @@ Cycle 022 implements the Cycle 021 test boundary. Server unit and Fastify inject
 The official Fastify cookie parser may be used only with identity decoding plus a narrow raw-header duplicate check. Vitest fake timers are sufficient for deterministic request time; no generic clock or mocking framework is justified.
 
 The focused real PostgreSQL 18.4 HTTP suite belongs at the outer server composition edge. It applies the existing migrations and proves one active authenticated response, one unknown anonymous response, one revoked anonymous response, and one closed-pool internal failure through Fastify injection. It complements rather than duplicates the 12-case persistence lifecycle matrix. Its parameterized fixture SQL is allowed only in filename-scoped server PostgreSQL integration tests, never server production source.
+
+## Sign-In and Session Issuance Test Plan
+
+Cycle 023 adds specification authority only. A future implementation must add focused contract/application/server/persistence evidence without duplicating the existing resolution lifecycle matrix:
+
+- strict ID00/ID04 request, success, and Problem Details schemas, including unknown keys, field limits, media type, and stable generic failures;
+- email normalization ownership and password boundary behavior without fixture values entering logs, errors, or snapshots;
+- verified, invalid, unverified, disabled, unknown, rate-limited, and infrastructure-failure outcomes through deterministic application ports;
+- Argon2id verification against synthetic PHC fixtures, equivalent dummy work for unknown identities, parameter parsing, and fail-closed decoder/runtime/database behavior;
+- session and CSRF credential shape plus independent CSPRNG invocation, without brittle assertions over random bytes;
+- exact domain-separated digest known-answer tests and proof that raw password/session/CSRF evidence never reaches persistence;
+- one explicit issuance instant, fixed 12-hour expiry, equality-expired compatibility, fresh selected-Business absence, and transaction rollback behavior;
+- fixation resistance by replacing only the prior presented session after commit, plus no cookie or authenticated CSRF result on any failed issuance;
+- exact production/local cookie name and attributes, `Max-Age=43200`, matching `Expires`, `no-store`, and no credential leakage;
+- pre-session CSRF expiry/consumption and authenticated CSRF binding, rotation, session invalidation, origin checks, and safe rejection;
+- real PostgreSQL migration/transaction coverage for verifier, challenge, session-CSRF, and aggregate rate-limit state, with container cleanup;
+- explicit proof that successful authentication does not query or establish Membership, capability, or Business authorization.
+
+Browser journey, merchant usability, password recovery, logout, protected product operations, alternate identity providers, mobile authentication, and deployment abuse controls remain later test categories. Randomness quality is established by use of the accepted platform CSPRNG and boundary assertions, not statistical unit tests.

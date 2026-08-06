@@ -318,10 +318,14 @@ Verify email:
 Authenticate:
 
 - Scope: global first, tenant context later.
-- Purpose: establish authenticated User session evidence.
-- Result: authenticated session without trusting remembered Business until revalidated.
-- Errors: unauthenticated, generic credential failure, email not verified for active operations, rate-limited or abuse-protected failure as future implementation.
+- Purpose: verify normalized-email/password proof and establish fresh authenticated User session evidence.
+- Input ownership: application receives normalized email and transient password through a dedicated use case; one narrow password-verification port returns verified, verification-required, or invalid proof and propagates infrastructure failure.
+- Issuance ownership: the server edge creates independent raw session/CSRF evidence and passes only keyed digest evidence and one explicit instant to an application-owned atomic issuance port.
+- Result: authenticated session with null selected Business, fixed absolute expiry, and no Membership/capability authority.
+- Errors: generic `AUTHENTICATION_FAILED`, email not verified only after correct proof, rate-limited, CSRF rejected, validation, or propagated internal failure.
 - Audit: sign-in success and suspicious failure patterns without credentials.
+
+The exact initial profile, including normalization, Argon2id, 12-hour expiry, fixation resistance, cookie writing, CSRF, and digest-only persistence, is defined by the [Session Issuance and Sign-In Specification](session-issuance-sign-in-specification.md). Application code must not receive Fastify, cookies, raw session/CSRF values, Argon2 library types, PostgreSQL rows, or Business authorization facts.
 
 Refresh or revalidate session:
 

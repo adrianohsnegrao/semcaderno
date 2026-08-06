@@ -435,3 +435,9 @@ Explicit non-goals: no credential issuance, login/logout, CSRF token implementat
 - [x] Future unit, Fastify, and real PostgreSQL HTTP test ownership is explicit.
 - [x] Security, privacy, alternatives, risks, deferrals, and overengineering are reviewed.
 - [x] No production code, dependency, lockfile, migration, SQL, database, route, cookie, authentication, authorization, product behavior, commit, push, branch, or pull request is introduced.
+
+## 21. Cycle 023 Issuance Profile
+
+The [Session Issuance and Sign-In Specification](session-issuance-sign-in-specification.md) closes the prior login, session-duration, cookie-write, pre-session/authenticated-CSRF, and minimum abuse-policy deferrals. It reuses both fixed cookie profiles and does not change the strict Cycle 022 read contract.
+
+Only a committed 201 ID04 response writes a fresh raw session credential with the existing profile attributes, `Max-Age=43200`, and matching `Expires`. Failed sign-in writes no cookie and never repairs existing evidence. ID00 supplies a short-lived in-memory pre-session CSRF value, while unsafe authenticated operations use independent session-bound CSRF evidence. Production implementation, exact Argon package selection, migrations, key rotation, logout, protected-operation enforcement, and deployment controls remain later work.
