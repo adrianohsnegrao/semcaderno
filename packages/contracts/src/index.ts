@@ -1,4 +1,13 @@
 export {
+  authenticationContractLimits,
+  sessionBootstrapResponseSchema,
+  signInRequestSchema,
+  signInResponseSchema,
+  type SessionBootstrapResponse,
+  type SignInRequest,
+  type SignInResponse,
+} from './authentication.js';
+export {
   commandResultMetadataSchema,
   concurrencyConflictMetadataSchema,
   conditionalRequestSchema,

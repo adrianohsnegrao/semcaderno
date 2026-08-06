@@ -303,3 +303,7 @@ Cycle 023 adds specification authority only. A future implementation must add fo
 - explicit proof that successful authentication does not query or establish Membership, capability, or Business authorization.
 
 Browser journey, merchant usability, password recovery, logout, protected product operations, alternate identity providers, mobile authentication, and deployment abuse controls remain later test categories. Randomness quality is established by use of the accepted platform CSPRNG and boundary assertions, not statistical unit tests.
+
+Cycle 024 implements the inner portion of this plan. Contract tests cover ID00 canonical/additive responses, strict ID04 input, exact ASCII email and normalized-password boundaries, canonical `p1`/`c1` evidence, authenticated safe output, stable generic failure, JSON serialization, determinism, non-mutation, and forbidden server-only exports. Application tests cover deterministic full-address lowercase normalization, unsupported ASCII/Unicode rejection, all three verifier outcomes, infrastructure-failure propagation, digest-only issuance inputs, selected-Business absence, explicit times, and issuance failure propagation.
+
+These tests prove boundary behavior only. They do not prove Argon2 comparison, account-enumeration timing, database lookup, transaction atomicity, CSPRNG quality, HMAC derivation, challenge consumption, session insertion, rate limiting, cookie writing, CSRF enforcement, HTTP behavior, authorization, or product usability. Those gates remain with their future infrastructure and transport owners.

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { contractLimits, correlationIdSchema } from './scalars.js';
 
 export const applicationErrorCodes = [
+  'AUTHENTICATION_FAILED',
   'AUTHENTICATION_REQUIRED',
   'SESSION_INVALID',
   'EMAIL_VERIFICATION_REQUIRED',
@@ -87,6 +88,7 @@ export const fieldViolationSchema = z.object({
 export type FieldViolation = z.infer<typeof fieldViolationSchema>;
 
 const problemHttpStatusByCode: Readonly<Record<ProblemCode, number | readonly number[]>> = {
+  AUTHENTICATION_FAILED: 401,
   AUTHENTICATION_REQUIRED: 401,
   SESSION_INVALID: 401,
   EMAIL_VERIFICATION_REQUIRED: 403,

@@ -3135,3 +3135,108 @@ Cycle 023 closes all semantic inputs for the inner boundary. Establishing execut
 Explicit non-goals:
 
 - No Argon2 dependency or password adapter, migration, SQL, session insertion, rate-limit store, crypto evidence generation, Fastify ID00/ID04 route, cookie writing, CSRF enforcement, login UI, logout, authorization/Membership, Business switching, product behavior, mobile, provider, telemetry, deployment, or merchant user testing.
+
+## Cycle 024 — Sign-In Contract and Application Boundary Implementation
+
+### Task 001 — Implement ID00/ID04 Transport Schemas, Email Normalization, Password-Verification Port, and Digest-Only Session-Issuance Ports
+
+Status: Complete. The reviewed browser-safe transport and framework-independent application boundaries are implemented; all infrastructure and HTTP behavior remain absent.
+
+Objective:
+
+Implement the smallest executable inner boundary authorized by Cycle 023: ID00/ID04 Zod schemas and inferred types, deterministic accepted-email normalization, a password-verification port with explicit outcomes/failure separation, digest-only session/CSRF issuance transaction types, and focused tests.
+
+Authority and preflight:
+
+- `AGENTS.md`, the repository-local `sem-caderno-cycle` Skill, README, Cycle 023 task evidence, the accepted sign-in/session specification, ADRs 0016-0018, 0020, 0022-0023, 0030, and 0032-0035, application/transport/authentication/session/persistence specifications, architecture, security/privacy, test strategy, and current source/tests were inspected before editing.
+- Git preflight found `main` at accepted Cycle 023 SHA `962ca63373ef6a7c72e340c63d8717511a49d11e`, one clean worktree, two commits, matching `origin/main`, the exact SSH origin, no generated output, and no Cycle 024 implementation.
+- The authority matrix classified strict ID00/ID04 JSON, the new generic authentication failure, ASCII email normalization, verification outcomes, and digest-only issuance as accepted. Argon2, persistence, transaction execution, cryptography, HTTP, cookie, CSRF enforcement, rate storage, authorization, and UI remain explicitly deferred. No blocker or contradiction remained.
+- One security-summary sentence incorrectly implied a password could never appear in a browser-safe request contract. The detailed accepted ID04 authority necessarily includes a transient password request field; documentation now clarifies that it is never a response, retained value, hash/verifier export, log, audit value, or persistence value.
+
+Implementation:
+
+- `authentication.ts` owns strict ID04 `{ email, password }`, additive ID00/ID04 responses, accepted email/password limits, canonical `p1`/`c1` browser evidence, and inferred types. Password output is NFC-normalized without trimming, case change, or coercion.
+- `errors.ts` adds stable 401 `AUTHENTICATION_FAILED` and enforces status/code consistency through the existing Problem Details schema.
+- The contracts root exports only operation schemas, inferred types, and reviewed limits. It exports no session credential/digest, HMAC key, password hash, or verifier schema.
+- `sign-in.ts` owns one nominal `NormalizedEmail`, deterministic full-address lowercase normalization for the accepted ASCII mailbox profile, `PasswordVerificationPort`, three explicit verification outcomes, and `SessionIssuanceTransactionPort`. Compile-time-only purpose brands keep session, pre-session-CSRF, and authenticated-CSRF digest values non-interchangeable without adding persistence fields.
+- Verification infrastructure failure remains promise rejection, never the `invalid` outcome. Issuance infrastructure failure likewise rejects rather than fabricating an issued session.
+- Issuance input contains User identity, `issuedAt`, `expiresAt`, session/pre-session-CSRF/authenticated-CSRF digests, and optional prior-session digest only. It contains no raw session/CSRF evidence, selected Business, HMAC key, password/hash, HTTP, transport, Argon2, PostgreSQL, Membership, capability, or authorization type.
+- No sign-in coordinator is implemented because verification, rate state, CSPRNG, digest derivation, challenge consumption, persistence, and cookie writing do not yet have infrastructure adapters in this cycle.
+
+Files created and updated:
+
+- Contract source created: `packages/contracts/src/authentication.ts`.
+- Contract source updated: `packages/contracts/src/errors.ts`, `packages/contracts/src/index.ts`.
+- Contract tests created: `packages/contracts/test/authentication.test.ts`.
+- Application source created: `packages/application/src/sign-in.ts`.
+- Application source updated: `packages/application/src/index.ts`.
+- Application tests created: `packages/application/test/sign-in.test.ts`.
+- Documentation updated: `README.md`, `docs/architecture/architecture.md`, `docs/quality/test-strategy.md`, `docs/security/privacy-and-lgpd.md`, `docs/specs/application-contracts.md`, `docs/specs/session-issuance-sign-in-specification.md`, `docs/specs/transport-api-contract-specification.md`, and this task register.
+- No domain, server, web, persistence, database-tool, configuration, manifest, lockfile, migration, SQL, environment, or ADR file changed.
+
+Tests:
+
+- Contract authentication tests cover canonical/additive ID00, invalid/missing bootstrap fields, strict ID04 request shape, unknown keys, ASCII email rules, NFC password normalization, Unicode scalar/UTF-8 limits, canonical CSRF evidence, safe authenticated response, stable generic Problem Details, determinism, JSON serialization, non-mutation, inferred types, and forbidden server-only exports.
+- Application sign-in tests cover deterministic normalization/idempotence, unsupported email rejection without value echo, verified/email-verification-required/invalid outcomes, verifier failure propagation, compile-time digest-purpose separation, digest-only issuance, explicit times, selected-Business/raw-evidence absence, and issuance failure propagation.
+- Existing contract, application, server, persistence, architecture, and build gates remain regression requirements; no mock is described as PostgreSQL or cryptographic evidence.
+
+Dependencies, persistence, and database:
+
+- No dependency, manifest, or lockfile change. Zod remains contracts-only; application has no external dependency. Argon2 remains intentionally absent.
+- No table, column, constraint, index, migration, SQL, repository, PostgreSQL adapter, transaction, fixture, or database process is introduced by production source.
+
+Initial failures and corrections:
+
+- One preflight ADR read used guessed filenames for ADRs 0016-0020 and failed with file-not-found output. The ADR index supplied the exact repository slugs; all relevant ADRs were then read successfully.
+- The first focused contract run passed type-checking but failed one boundary test because the synthetic maximum email was accidentally 255 characters. The fixture local part was reduced by one character; the rerun passed without weakening the 254-byte schema limit.
+- One validation shell resolved the host defaults Node 20.20.2 and pnpm 9.15.0, so its successful lint result was not accepted as Cycle 024 evidence. The repository-pinned Node 24.19.0 installation was activated explicitly; Node 24.19.0, Corepack 0.35.0, and pnpm 11.20.0 were reverified before lint and every subsequent executable gate passed under the required toolchain.
+- Two guessed focused-test script names (`test:contracts` and `test:application`) did not exist. The root manifest was reinspected and the authoritative `contract:test` and `application:test` commands then passed. No repository file changed for this command correction.
+- An attempted parallel validation wrapper yielded overlapping lint/type-check processes without retaining reliable completion output. The processes were allowed to finish, no validation process remained, and lint plus type-check were rerun serially under the pinned runtime before their results were accepted.
+- The first browser-safety scan incorrectly treated the intentionally browser-visible `csrfToken` response fields as server-only leakage. The scan was narrowed to the actual prohibited session credential, digest, HMAC, password-verifier, infrastructure, environment, and hidden-time concepts; the corrected scan passed without a source change.
+
+Validation evidence:
+
+- Pre-edit runtime, 54 contract tests, and 5 application tests passed.
+- Node 24.19.0, Corepack 0.35.0, and pnpm 11.20.0 passed the runtime baseline. Prettier formatting/checking and documentation validation passed for 63 Markdown files, 375 local links, and 108 tables.
+- Corrected focused suites passed: 81 contract tests in three files and 22 application tests in two files. The aggregate suite passed 177 tests: 81 contract, 22 application, 62 server-edge, and 12 real-PostgreSQL persistence tests, plus the controlled architecture-validator self-test.
+- Type-aware ESLint and every workspace type-check passed. Architecture validation retained seven approved private workspaces, 47 modules, 46 dependencies, no violation, and the passing controlled-invalid self-test.
+- Contracts, domain, application, PostgreSQL persistence, server, isolated database tool, and the neutral Next.js production application built successfully. All three ordered migration sources retained their accepted checksums and passed static migration validation; Cycle 024 introduced no migration or PostgreSQL behavior.
+- The complete root `pnpm run validate` passed before cleanup and passed again from a clean generated state. Package-root export inspection, dependency direction, browser safety, implicit-time, credential/secret, draft-marker, artifact, Markdown, and changed-text hygiene scans passed.
+- `pnpm run clean` removed all reproducible TypeScript, Next.js, declaration, and test output before the clean-state rerun and again after final validation. `git diff --check`, final repository status, branch/HEAD/upstream, and generated-output inspections passed with only the 15 intended Cycle 024 paths changed or untracked.
+
+ADR assessment:
+
+- No ADR is required or changed. Cycle 024 implements ADRs 0033-0035 and the accepted Cycle 023 specification without selecting a new durable cross-cutting alternative.
+
+Overengineering assessment:
+
+- Added one cohesive contract module and one cohesive application module. Reused existing envelopes, identifiers, instants, Problem Details, package roots, and test ownership.
+- Rejected a sign-in coordinator, generic identity/token/digest framework, branded runtime factories, strategy registry, DI container, request context, clock, repository/transaction base, crypto helper, Argon adapter, rate service, server mapper, and route because no current executable dependency can fulfill them in this cycle.
+
+Explicit non-goals:
+
+- No Argon2/bcrypt/scrypt/PBKDF2, password hash/storage, migration, SQL, PostgreSQL credential lookup, transaction orchestration, session insertion, CSPRNG, HMAC issuance, Fastify ID00/ID04 route, cookie writing, CSRF middleware/enforcement, rate-limit persistence, login UI, logout, registration, reset, authorization/Membership, Business switching, protected product API, mobile, provider, telemetry, deployment, JWT/OAuth/refresh token, commit, push, branch, or pull request.
+
+User-testing status:
+
+- Not applicable. Cycle 024 adds no merchant-facing UI, workflow, browser journey, usability claim, or accessibility-conformance claim.
+
+Recommended next cycle:
+
+Cycle 025 — Password Verification Persistence Foundation.
+
+Recommended next task:
+
+Task 001 — Implement the Argon2id Credential Verification Adapter and Minimum User Password-Credential Migration.
+
+Objective:
+
+Select and verify the exact maintained Argon2 package, add only the authorized `user_password_credentials` migration, implement the application-owned `PasswordVerificationPort` in PostgreSQL infrastructure, and prove verified, verification-required, invalid, dummy-work, and infrastructure-failure behavior against real PostgreSQL.
+
+Why next:
+
+Cycle 024 makes verifier ownership and outcomes executable while leaving infrastructure intentionally absent. Implementing that one adapter and its minimum persistence prerequisite is the smallest next inward-to-outward step before session/challenge/CSRF issuance transactions or Fastify sign-in exposure.
+
+Explicit non-goals:
+
+- No pre-session challenge, session-CSRF, or rate-limit migration; no session issuance transaction, CSPRNG/HMAC issuance, ID00/ID04 route, cookie writing, CSRF enforcement, registration, recovery, logout, authorization/Membership, Business switching, product API/UI, mobile, provider, telemetry, deployment, or merchant user testing.

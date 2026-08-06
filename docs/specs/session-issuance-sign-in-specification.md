@@ -348,12 +348,20 @@ The separate pre-session/session/CSRF/rate evidence exists because each solves a
 - [x] Security, privacy, testing, alternatives, deferrals, and overengineering are reviewed.
 - [x] No production code, dependency, lockfile, migration, SQL, route, cookie write, credential verification, session insertion, CSRF behavior, commit, push, branch, or pull request is introduced.
 
-## 19. Recommended Next Cycle
+## 19. Cycle 024 Implementation Profile
 
-**Cycle 024 - Sign-In Contract and Application Boundary Implementation**
+Cycle 024 implements the reviewed inner contract/application boundary without infrastructure. `@sem-caderno/contracts` now owns strict ID04 request validation, NFC password normalization, additive ID00/ID04 response validation, canonical browser-visible `p1`/`c1` evidence, inferred types, exact limits, and stable 401 `AUTHENTICATION_FAILED`. It exports no server credential, digest, HMAC key, password hash, or verifier shape.
 
-**Task 001 - Implement ID00/ID04 Transport Schemas, Email Normalization, Password-Verification Port, and Digest-Only Session-Issuance Ports**
+`@sem-caderno/application` now owns deterministic accepted-ASCII primary-email validation and complete-address lowercase normalization, a nominal normalized-email type, the three-outcome `PasswordVerificationPort`, and `SessionIssuanceTransactionPort`. Issuance input contains only User identity, explicit issuance/expiry dates, and versioned session/pre-session-CSRF/authenticated-CSRF digests plus an optional prior-session digest. It has no raw bearer, selected Business, transport, Fastify, crypto, Argon2, PostgreSQL, or authorization type.
 
-Objective: implement only browser-safe ID00/ID04 schemas and the framework-independent application boundaries for credential verification and digest-only issuance, with deterministic unit/contract tests, before adding Argon2/PostgreSQL migrations or Fastify cookie writing.
+Focused tests prove valid/invalid/boundary transport behavior, additive/strict policies, normalization determinism, non-mutation, serialization, generic error identity, verifier failure separation, digest-only issuance, and public-export safety. No adapter, orchestration, database change, credential generation, HMAC, route, cookie, or CSRF enforcement is added.
 
-Explicit non-goals: no Argon2 adapter, password table/migration, session insertion, cookie writing, Fastify sign-in route, CSRF enforcement, registration, recovery, logout, authorization, Business selection, UI, provider, deployment, or merchant testing.
+## 20. Recommended Next Cycle
+
+**Cycle 025 - Password Verification Persistence Foundation**
+
+**Task 001 - Implement the Argon2id Credential Verification Adapter and Minimum User Password-Credential Migration**
+
+Objective: select and verify the exact maintained Argon2 package, add only the authorized `user_password_credentials` migration, implement `PasswordVerificationPort` in PostgreSQL infrastructure, and prove verified/unverified/invalid/dummy-work/failure behavior against real PostgreSQL.
+
+Explicit non-goals: no session/challenge/CSRF/rate-limit migration, session issuance transaction, CSPRNG or HMAC issuance, Fastify ID00/ID04 route, cookie writing, CSRF enforcement, registration, recovery, logout, authorization, Business selection, UI, provider, deployment, or merchant testing.

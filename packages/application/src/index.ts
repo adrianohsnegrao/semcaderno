@@ -1,4 +1,17 @@
 export {
+  normalizePrimaryEmail,
+  type AuthenticatedCsrfDigest,
+  type IssuedSession,
+  type IssueSessionInput,
+  type NormalizedEmail,
+  type PasswordVerificationPort,
+  type PasswordVerificationResult,
+  type PreSessionCsrfDigest,
+  type SessionCredentialDigest,
+  type SessionIssuanceTransactionPort,
+  type VerifyPasswordInput,
+} from './sign-in.js';
+export {
   createInspectCurrentSession,
   type AnonymousSessionInspection,
   type AuthenticatedSessionInspection,

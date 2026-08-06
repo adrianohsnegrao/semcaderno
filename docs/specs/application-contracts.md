@@ -327,6 +327,10 @@ Authenticate:
 
 The exact initial profile, including normalization, Argon2id, 12-hour expiry, fixation resistance, cookie writing, CSRF, and digest-only persistence, is defined by the [Session Issuance and Sign-In Specification](session-issuance-sign-in-specification.md). Application code must not receive Fastify, cookies, raw session/CSRF values, Argon2 library types, PostgreSQL rows, or Business authorization facts.
 
+Cycle 024 implements only the framework-independent inner boundary. `normalizePrimaryEmail` validates the accepted ASCII mailbox profile and lowercases the complete address into an application-owned nominal type. `PasswordVerificationPort` receives that normalized value plus the transient NFC-normalized password and returns only verified, email-verification-required, or invalid; adapter failure rejects. `SessionIssuanceTransactionPort` receives explicit User/time values and versioned session/CSRF digests only, with optional prior-session digest for fixation replacement. Compile-time purpose brands prevent session, pre-session-CSRF, and authenticated-CSRF digests from being substituted for one another without changing their runtime representation. The port returns safe issued-session identity/expiry and has no selected-Business or bearer field.
+
+No sign-in coordinator, Argon2 adapter, password row, transaction, CSPRNG, digest derivation, session insertion, rate-limit store, cookie writer, CSRF validator, or HTTP mapping is implemented by this profile.
+
 Refresh or revalidate session:
 
 - Purpose: determine whether session remains valid and whether active Business context still authorizes use.

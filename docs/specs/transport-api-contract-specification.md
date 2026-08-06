@@ -856,8 +856,9 @@ Request context schemas are strict. Response schemas accept additive object prop
 | Namespace/version | `scalars.ts` | `/api/v1` constant and `v1` marker implemented; no second version |
 | JSON-safe values | `scalars.ts` | rejects non-finite numbers, bigint, Date, Map, Set, functions, symbols, and cycles |
 | Identifiers, money, quantity, dates | `scalars.ts` | cross-cutting representations and limits implemented |
+| ID00/ID04 authentication | `authentication.ts` | strict sign-in input, normalized-password output, additive bootstrap/sign-in responses, and canonical browser-visible CSRF evidence |
 | Session and selected Business | `context.ts` | anonymous/authenticated response context and distinct selected-Business context; never authorization |
-| Stable errors | `errors.ts` | all 26 Cycle 007 categories plus five transport-only codes; status/code consistency enforced |
+| Stable errors | `errors.ts` | accepted application categories including `AUTHENTICATION_FAILED` plus five transport-only codes; status/code consistency enforced |
 | Success-status codes | `errors.ts` | replay, unknown outcome, stale projection, and delivery states remain non-Problem codes |
 | Command result | `commands.ts` | first commit versus replay and unknown outcome represented; confirmed rejection remains Problem Details |
 | Outcome recovery | `commands.ts` | committed, rejected, authoritative no-commit, and unknown branches; only no-commit permits retry |
@@ -868,7 +869,7 @@ Request context schemas are strict. Response schemas accept additive object prop
 | Envelopes | `envelopes.ts` | single-resource and data-plus-metadata response composition |
 | Public surface | `index.ts` | package-root executable schemas, constants, and inferred types only; no subpaths |
 
-Exact operation request/response DTOs for Business, team, Customer, Product, Sale, Payment, Allocation, Payment Request, Expense, and reports remain deferred. Section 15 specifies their logical input and result but does not close exact fields, requiredness, nullability, or product-text limits. They must be added as reviewed contract slices before their corresponding Fastify route; placeholder DTOs are prohibited. Cycle 023 closes ID00/ID04 fields and outcomes in the [Session Issuance and Sign-In Specification](session-issuance-sign-in-specification.md), but their executable Zod schemas remain a later implementation slice. Correlation-header spelling, domain filter/sort enums, cursor encoding, and OpenAPI generation remain deferred. Cycle 021 fixes the ID05 production/local cookie names and strict extraction behavior in the [HTTP session evidence specification](http-session-evidence-configuration-specification.md).
+Exact operation request/response DTOs for Business, team, Customer, Product, Sale, Payment, Allocation, Payment Request, Expense, and reports remain deferred. Section 15 specifies their logical input and result but does not close exact fields, requiredness, nullability, or product-text limits. They must be added as reviewed contract slices before their corresponding Fastify route; placeholder DTOs are prohibited. Cycle 024 implements the Cycle 023 ID00/ID04 fields and outcomes in `authentication.ts`; HTTP headers, cookie writing, and route behavior remain server concerns. Correlation-header spelling, domain filter/sort enums, cursor encoding, and OpenAPI generation remain deferred. Cycle 021 fixes the ID05 production/local cookie names and strict extraction behavior in the [HTTP session evidence specification](http-session-evidence-configuration-specification.md).
 
 ### 30.3 Cycle 016 current-session inspection mapping
 
@@ -886,8 +887,10 @@ Cycle 021 reconciles the older ID05 inventory wording with the stable Cycle 016 
 
 Cycle 022 implements `GET /api/v1/session` with production cookie `__Host-sem-caderno-session` or the explicit loopback local profile `sem-caderno-session`. It returns `Cache-Control: no-store`, emits no `Set-Cookie` or ETag, and needs no CSRF token because it is read-only. Configuration fails before application construction; crypto, application, PostgreSQL, decoding, mapping, and unexpected request failures remain safe 500 `INTERNAL_FAILURE` Problem Details rather than anonymous. The public response schema and API version do not change.
 
-### 30.5 Cycle 023 ID00 and ID04 profile
+### 30.5 Cycle 023/024 ID00 and ID04 profile
 
 Cycle 023 makes ID00 and ID04 authoritative without adding executable schemas. ID00 returns only a short-lived `p1` pre-session CSRF token and expiry. ID04 accepts a strict JSON object containing normalized-email input and password plus the required header/origin CSRF evidence. Successful verification returns 201, the safe authenticated User state, absolute expiry, and an independent in-memory `c1` authenticated CSRF token; the session credential appears only in the configured HttpOnly cookie.
 
 Wrong password, unknown identity, disabled User, and missing credential binding share 401 `AUTHENTICATION_FAILED`. A correct proof for an unverified identity may return `EMAIL_VERIFICATION_REQUIRED`; invalid CSRF, rate limiting, request validation, and internal failures retain their stable categories. Every response is `no-store`, failed issuance writes no cookie, and no response exposes a password, session credential/digest, CSRF digest, internal session identifier, Membership, permission, selected Business, or infrastructure detail.
+
+Cycle 024 implements these reviewed JSON bodies as package-root Zod exports with inferred TypeScript types. ID04 request input is strict, rejects unknown fields and unsupported email/password representations, and returns an NFC-normalized password without lowercasing or trimming it. ID00 and ID04 response schemas follow the additive response policy and strip unknown output fields. Canonical `p1` and `c1` evidence is validated as the exact prefix plus 32-byte canonical unpadded base64url representation. The public package exports no cookie/session credential, digest, HMAC key, password hash, or verifier schema.
