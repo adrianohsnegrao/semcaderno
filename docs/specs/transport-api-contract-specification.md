@@ -287,7 +287,7 @@ For every row, the presentation content catalogue owns merchant-tested Brazilian
 | External delivery failed | `EXTERNAL_DELIVERY_FAILED` / 200 status resource | retry delivery when eligible | domain commit exists | preserve Request | no provider internals |
 | Internal failure | `INTERNAL_FAILURE` / 500 | recover if commit not proven absent | possibly | preserve original intent | generic; correlation only |
 
-Transport-only failures are `MALFORMED_REQUEST` (400), `UNSUPPORTED_MEDIA_TYPE` (415), `CSRF_REJECTED` (403), `PRECONDITION_REQUIRED` (428), and `RATE_LIMITED` (429). They do not add domain meaning. Rate limiting is required at sensitive identity and abuse-prone boundaries but exact policy is deferred. RFC 6585 defines 428 and 429. See [RFC 6585](https://www.rfc-editor.org/rfc/rfc6585.html).
+Transport-only failures are `MALFORMED_REQUEST` (400), `UNSUPPORTED_MEDIA_TYPE` (415), `CSRF_REJECTED` (403), `PRECONDITION_REQUIRED` (428), and `RATE_LIMITED` (429). They do not add domain meaning. Rate limiting is required at sensitive identity and abuse-prone boundaries. The initial ID04 account-keyed policy is now exact in the [Session Issuance and Sign-In Specification](session-issuance-sign-in-specification.md); policies for other operations remain deferred. RFC 6585 defines 428 and 429. See [RFC 6585](https://www.rfc-editor.org/rfc/rfc6585.html).
 
 Multiple independent field violations may be returned in one `violations` array when bounded safely. One primary application code controls recovery; the API does not return a bag of contradictory top-level errors.
 

@@ -38,7 +38,7 @@ The public Cycle 016/022 `GET /api/v1/session` contract remains unchanged.
 | Selected Business | New session starts with no selected Business | Accepted now |
 | Authorization | Authentication creates global identity context only | Already authoritative |
 | Failure | Invalid proof is expected failure; configuration, crypto, Argon2, PostgreSQL, mapping, and unexpected failures propagate | Accepted now |
-| Abuse control | Ten failed attempts per normalized identity in 15 minutes; aggregate keyed state only | Accepted now |
+| Abuse control | Fixed-start 15-minute aggregate window; the tenth failed verification closes the window to subsequent attempts | Accepted now |
 | Provider, MFA, passkeys, OAuth | Not in the initial profile | Deferred |
 
 No item blocks the next implementation slice.
@@ -135,9 +135,111 @@ Argon2 comparison and persistence errors are infrastructure failures, not invali
 
 ## 6. Abuse Boundary
 
-One normalized identity may accumulate at most 10 failed verification outcomes in a rolling 15-minute window. The next attempt during the active limit returns `RATE_LIMITED`. A fully committed successful sign-in clears the aggregate bucket. Unknown and known identities follow the same policy.
+### 6.1 Accepted aggregate algorithm
 
-Shared multi-process enforcement stores only a versioned HMAC digest of the normalized email, window timestamps, count, and expiry. It stores no raw email, password, IP address, user agent, device identifier, or attempt history. State expires no later than 24 hours after its last update. The HMAC uses the server-held session security key with a distinct `sem-caderno/sign-in-rate-limit/v1` domain label; the digest never becomes a correlation or public value.
+One account key has at most one fixed-start aggregate window. This is an accepted approximation, not an exact sliding or rolling window. Exact sliding semantics would require per-attempt timestamps or bounded time buckets, which conflict with the accepted minimum aggregate and no-attempt-history boundary.
+
+The persisted state is:
+
+- `account_key_version = 1` and `account_key_digest`, the unique pseudonymous account key;
+- `window_started_at`, the instant of the first counted failure in this window;
+- `window_ends_at = window_started_at + 15 minutes`;
+- `failure_count`, an integer from 1 through 10 inclusive;
+- `updated_at`, the instant of the latest failure that changed the aggregate;
+- `retention_expires_at = updated_at + 24 hours`;
+- positive `version`, incremented for every state-changing record operation.
+
+The active interval is half-open: `window_started_at <= evaluatedAt < window_ends_at`. `check` returns `limited` if and only if that interval is active and `failure_count = 10`; every other valid state returns `allowed`. Equality with `window_ends_at` is expired and verification may resume. An absent row, a row evaluated at or after `window_ends_at`, or a row evaluated at or after `retention_expires_at` is not limited. Reads do not mutate or extend any timestamp.
+
+The first counted failure creates count 1 and the exact derived timestamps. A subsequent counted failure inside the active interval increments the count and `version`, sets `updated_at` to its explicit occurrence instant, and sets `retention_expires_at` to exactly 24 hours after that instant; it does not move `window_started_at` or `window_ends_at`. A failure at or after `window_ends_at` replaces the expired aggregate with a new count-1 window beginning at that failure instant.
+
+The counter saturates at 10. The failure that changes count 9 to count 10 was already admitted for password verification and still returns generic `AUTHENTICATION_FAILED`; recording it makes the account key limited immediately for subsequent checks. A check before the next verification returns `RATE_LIMITED` until `window_ends_at`, exclusively. An in-flight failure admitted concurrently before the threshold may still finish, but a record call that observes count 10 performs no mutation, does not extend the window or retention, and returns the limited post-state. This profile therefore does not claim that no more than ten verifier operations can execute under concurrency.
+
+### 6.2 Counted outcomes and clearing
+
+Only `PasswordVerificationPort` outcome `invalid` is a counted failure. That outcome already covers wrong password, unknown identity, disabled User, and absent password credential through the generic account-existence-safe path. Known and unknown identities therefore use the same account-keyed policy.
+
+`verified` does not record a failure, but verification alone does not clear state. `emailVerificationRequired`, malformed transport input, rejected pre-session CSRF or origin evidence, and a request rejected by the rate check do not record or clear state. Configuration, HMAC, Argon2, PostgreSQL, mapping, serialization, and other infrastructure failures do not record or clear state and remain failures.
+
+Only a fully committed successful sign-in clears the account-key row, as part of the accepted issuance transaction. Clearing an absent row is an idempotent success. A verified proof followed by any issuance failure does not clear state.
+
+### 6.3 Application-owned contract
+
+The future application boundary is one purpose-specific `SignInRateLimitPort` with these conceptual values and operations:
+
+```text
+SignInRateLimitAccountKey = {
+  digestVersion: 1,
+  digestBase64Url: canonical 43-character unpadded base64url
+}
+
+SignInRateLimitDecision =
+  | { outcome: "allowed" }
+  | { outcome: "limited", retryAt: Date }
+
+check({ accountKey, evaluatedAt }) -> SignInRateLimitDecision
+recordFailure({ accountKey, occurredAt }) -> SignInRateLimitDecision
+clear({ accountKey }) -> void
+```
+
+`check` reports whether a new verification may begin. `recordFailure` returns the post-record state for subsequent attempts; it does not reclassify the current invalid proof. Neither operation exposes the internal count. `retryAt` is exactly `window_ends_at`. All operation instants are explicit valid `Date` values and are defensively copied at the boundary. No operation reads an implicit clock or SQL current time.
+
+An operation instant earlier than persisted `updated_at` is an invalid temporal ordering and must reject through the internal failure boundary rather than roll state backward or return `allowed`. Equal instants are permitted so concurrent failures captured from one request-time source can serialize deterministically. Persistence, decoding, connection, and temporal-order failures reject; they are never `allowed`, `limited`, or an authentication failure.
+
+### 6.4 Atomic concurrency contract
+
+Operations for one account key are linearizable:
+
+- absent-state creation and expired-window replacement allow one serialized creator; concurrent recorders then apply to that row in order;
+- concurrent failure records increment atomically up to 10, with no lost increment and no value above 10;
+- a check ordered before a record may return `allowed`; a check ordered after the threshold-reaching record returns `limited`;
+- a record ordered after count 10 is a non-mutating limited result;
+- clear and record are serialized. If clear is ordered last, no row remains. If a later failure record is ordered after clear, it creates a fresh count-1 window;
+- successful issuance must perform its clear in the same transaction as session creation, so rollback preserves the prior aggregate.
+
+The contract defines observable ordering, not a required SQL locking technique. PostgreSQL tests must force and prove both clear/record orderings rather than assume scheduler order.
+
+### 6.5 Account-key derivation
+
+The server security edge derives the account key only after `normalizePrimaryEmail` has produced the accepted lowercase ASCII `NormalizedEmail`. Version 1 is exactly:
+
+```text
+HMAC-SHA-256(
+  session_hmac_key_v1,
+  UTF8("sem-caderno/sign-in-rate-limit/v1") || 0x00 || UTF8(normalized_email)
+)
+```
+
+The version participates in the fixed domain label. The normalized-email bytes contain no NUL under the accepted ASCII mailbox profile, so the single zero separator makes framing unambiguous. The complete 32-byte HMAC output is represented at the application boundary as exactly 43 canonical unpadded base64url characters with `digestVersion = 1`, then decoded to the same 32 bytes for persistence. The server-held key remains the accepted version-1 session security key and never enters application, contracts, PostgreSQL, logs, audit, analytics, or support data.
+
+Only version 1 is accepted now. The stored version permits a separately specified future cutover, but no multi-key lookup, fallback, rotation, or strategy registry is authorized. The same normalized email and key deterministically produce the same account key; different normalized emails or domain labels produce different framed HMAC inputs.
+
+### 6.6 Retention and physical deletion
+
+An expired window is logically inactive immediately at `window_ends_at`; it need not remain physically present for sign-in correctness. The row becomes eligible for deletion at that instant and must be physically deleted no later than `retention_expires_at`, exactly 24 hours after the latest state-changing failure. Equality with `retention_expires_at` is outside retention. Encountering a retained but expired row during `recordFailure` replaces it; `check` treats it as allowed without extending it.
+
+The future persistence slice must expose or implement a narrow bounded cleanup operation capable of deleting `retention_expires_at <= evaluatedAt` rows. Scheduling that operation is deployment work, but no production deployment may retain these rows beyond the stated deadline. Cleanup is infrastructure housekeeping and does not enter the browser-safe or sign-in application contract.
+
+### 6.7 Normative examples
+
+For one synthetic account key and `t0 = 2026-08-06T12:00:00Z`:
+
+| Event | Required result and state |
+| --- | --- |
+| First invalid proof at `t0` | Current response remains `AUTHENTICATION_FAILED`; store count 1, window `[12:00, 12:15)`, updated `12:00`, retention `2026-08-07T12:00:00Z`. |
+| Failures 2 through 9 before `12:15` | Increment atomically; keep the same window; each failure moves `updated_at` and retention by exactly 24 hours. |
+| Tenth invalid proof at `12:09` | Store count 10; current response remains `AUTHENTICATION_FAILED`; post-state is limited with retry `12:15`; retention is `2026-08-07T12:09:00Z`. |
+| Check at `12:09:01` | `limited`, retry `12:15`; do not call the verifier and do not mutate the row. |
+| Check at exactly `12:15` | `allowed`; equality is expired. |
+| Invalid proof at exactly `12:15` | Replace with count 1 and window `[12:15, 12:30)`. |
+| Fully committed sign-in | Delete the row atomically with issuance. |
+| Clear with no row | Succeed without creating state. |
+| Eight concurrent records from count 7 | Exactly three state changes produce counts 8, 9, and 10; the other five observe the saturated limited state without mutation. |
+| Concurrent clear and record | The linearized last operation wins: clear-last leaves no row; record-last creates a fresh count-1 row. |
+| Retention equality | A row with retention `2026-08-07T12:09:00Z` must not exist after that instant and is logically absent at equality. |
+| Same normalized email | Repeated derivation with the same key and exact framing returns the same version-1 digest. |
+| Different identity or domain | The framed HMAC input differs before cryptographic evaluation. |
+| PostgreSQL/HMAC/temporal failure | Reject as internal failure; never return `allowed`, `limited`, or generic invalid proof. |
 
 This account-keyed minimum does not claim comprehensive denial-of-service or distributed credential-stuffing protection. Reverse-proxy/global controls require later deployment evidence, but their absence must not weaken this application limit.
 
@@ -237,7 +339,7 @@ No migration is created now. Future implementation is authorized to add only the
 - `user_password_credentials`: one row per User with Argon2id PHC verifier, timestamps, and positive version; restrictive User foreign key;
 - `pre_session_challenges`: keyed digest/version, creation, expiry, optional consumed instant, and positive version; no identity or Business required;
 - `sessions`: authenticated CSRF digest/version columns, both required for newly issued sessions under an expand-and-contract rollout;
-- `sign_in_rate_limits`: keyed normalized-identity digest, rolling-window timestamps/count, expiry, and positive version; aggregate only, not attempt history.
+- `sign_in_rate_limits`: unique versioned account-key digest, fixed window start/end, saturated failure count, last state-changing update, exact retention deadline, and positive version; aggregate only, not attempt history.
 
 The existing session credential columns and constraints remain authoritative. Migration order, compatibility for existing Cycle 019 test rows, backfill/default strategy, exact index names, and credential-library dependency version must be reviewed in the implementation cycle. Raw password, raw session credential, raw CSRF value, HMAC key, IP, user agent, device, location, login history, arbitrary metadata, and authorization cache are prohibited.
 
@@ -287,7 +389,7 @@ The implementation cycle must add focused deterministic evidence for:
 - strict ID00/ID04 request, media type, email normalization, password bounds, and unknown-key behavior;
 - successful, wrong, unknown, disabled, missing-credential, and verified-but-unverified outcomes without enumeration differences;
 - dummy-hash path and propagation of hash decoder/Argon2/database failures;
-- abuse threshold/window, known/unknown parity, expiry, successful clear, and no raw identity retention;
+- fixed-start abuse threshold/window, known/unknown parity, half-open expiry, exact retention, successful clear, linearizable record/clear behavior, and no raw identity retention;
 - independent CSPRNG calls and exact token shapes without asserting random bytes;
 - existing session HMAC derivation reuse and exact distinct CSRF/rate domain separation;
 - transaction atomicity, fresh session insertion, prior-presented-session revocation, null selected Business, and collision retry limit;
@@ -372,9 +474,13 @@ The ordered migration creates only UUIDv7 identity, digest version/bytes, creati
 
 This standalone lifecycle boundary does not replace the accepted atomic issuance requirement. A future `SessionIssuanceTransactionPort` adapter must perform the same challenge predicate inside the transaction that revalidates User, revokes prior presented session, inserts the fresh session, records safe audit evidence, and clears rate state.
 
-## 22. Recommended Next Cycle
+## 22. Cycle 027 Rate-Limit Semantics Closure Profile
 
-**Cycle 027 - Sign-In Rate-Limit Persistence Foundation**
+Cycle 027 closes the previously blocked rate-limit authority without production code. It selects an explicit fixed-start aggregate window instead of inaccurately calling the minimal state an exact rolling window; defines threshold, counted outcomes, read/record/clear results, temporal ordering, retention, and concurrency; and fixes the version-1 normalized-email HMAC framing. No application port, server digester, adapter, SQL, migration, dependency, or PostgreSQL test is added by this specification closure.
+
+## 23. Recommended Next Cycle
+
+**Cycle 028 - Sign-In Rate-Limit Persistence Foundation**
 
 **Task 001 - Implement Account-Keyed Aggregate Failure Tracking and Clearing Boundaries**
 

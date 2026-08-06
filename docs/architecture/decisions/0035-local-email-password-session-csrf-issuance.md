@@ -18,6 +18,8 @@ After successful verification, the server security edge independently generates 
 
 Password verification uses reviewed Argon2id PHC verifiers and equivalent dummy work for unknown identities. Invalid proof and disabled/unknown identity are publicly generic; infrastructure failure remains failure. Authentication proves global User identity only and performs no Business or Membership authorization.
 
+Sign-in abuse state uses a pseudonymous account key and one fixed-start 15-minute aggregate window with a counter capped at 10. It is explicitly not an exact sliding window: preserving exact sliding semantics would require per-attempt timestamps or buckets that violate the accepted minimum-data boundary. The server derives the account key with the version-1 session HMAC key, the distinct sign-in-rate domain, one zero separator, and the normalized-email UTF-8 bytes; application and persistence receive only the versioned digest.
+
 ## Consequences
 
 - Initial sign-in does not depend on an external identity provider, OAuth, JWT, refresh token, or browser-readable session credential.
@@ -26,6 +28,7 @@ Password verification uses reviewed Argon2id PHC verifiers and equivalent dummy 
 - Successful authentication always replaces the browser's presented session with independent evidence, preventing credential adoption/fixation.
 - A fixed 12-hour absolute session avoids idle/sliding write complexity in the first profile.
 - Authenticated CSRF remains a distinct session-bound synchronizer value and cannot become authentication or authorization evidence.
+- The tenth admitted invalid proof closes its fixed window to later verification attempts; equality with the window end reopens verification, and only committed issuance clears the row.
 - Local password verification creates breach-response and hashing-parameter obligations that must be reviewed operationally before production.
 
 ## Alternatives Considered
@@ -37,6 +40,7 @@ Password verification uses reviewed Argon2id PHC verifiers and equivalent dummy 
 - Pass raw session/CSRF evidence through application or persistence. Rejected because it expands bearer-secret exposure.
 - Reuse the incoming session credential after authentication. Rejected because it permits fixation and fails to create an independent authenticated transition.
 - Generic credential strategies or token framework. Rejected because only one current variation exists.
+- Exact sliding-window history. Rejected because per-attempt timestamps or bounded buckets add identity-linked history beyond the accepted aggregate minimum; the fixed-start approximation is named honestly and must be revisited if measured abuse requires stronger controls.
 
 ## Risks and Revisit Triggers
 
@@ -54,5 +58,5 @@ This ADR specializes ADRs 0020, 0023, 0034, and the identity/session operation f
 
 - Implement ID00/ID04 contract schemas and application-owned verification/issuance boundaries.
 - Select and audit the exact Argon2 package/version before adding it.
-- Add expand-and-contract credential, pre-session CSRF, session-CSRF, and aggregate-rate migrations.
+- Add the remaining session-CSRF and fixed-window aggregate-rate migrations.
 - Implement Fastify sign-in/cookie writing and authenticated CSRF enforcement only after the inner boundaries are green.

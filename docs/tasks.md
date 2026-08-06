@@ -3065,7 +3065,7 @@ Specification decisions:
 - One transaction revalidates the User, consumes the ID00 challenge, revokes only the prior presented session, inserts the fresh session with null selected Business, records minimal safe audit evidence, and clears aggregate rate state. Any failure rolls the entire issuance back.
 - Only a committed 201 writes the accepted production/local session cookie with `HttpOnly`, `SameSite=Lax`, `Path=/`, no `Domain`, `Max-Age=43200`, and matching `Expires`; production remains `Secure` and `__Host-` constrained.
 - ID00 returns a 10-minute in-memory `p1` CSRF token. ID04 returns the independent `c1` token in a no-store body. Unsafe authenticated operations later validate session, CSRF digest, origin evidence, Fetch Metadata when present, authorization, and input separately.
-- The minimum account-keyed abuse policy is 10 failures in a rolling 15 minutes using only a normalized-identity HMAC digest and bounded aggregate state. No IP, device, user-agent, or attempt history is stored.
+- The minimum account-keyed abuse policy was initially described as 10 failures in a rolling 15 minutes using only a normalized-identity HMAC digest and bounded aggregate state. Cycle 027 later replaces the ambiguous word "rolling" with the exact fixed-start aggregate semantics required for implementation. No IP, device, user-agent, or attempt history is stored.
 - Authentication establishes only global User context. Selected Business starts absent and never proves Membership, capability, tenant access, or authorization.
 
 Files created and updated:
@@ -3372,9 +3372,41 @@ Deferred and not applicable:
 - Sign-in rate limiting, complete issuance transaction, session/authenticated-CSRF migration, CSPRNG generation, ID00/ID04 Fastify routes, cookie writing, final CSRF enforcement, authorization/Membership, Business switching, product API/UI, mobile, provider, telemetry, deployment, retention cleanup, and merchant user testing remain deliberately deferred.
 - Browser/mobile/provider/deployment/accessibility/product-validation and merchant-testing gates are not applicable because no merchant-facing behavior exists.
 
+## Cycle 027 — Sign-In Rate-Limit Semantics Closure
+
+### Task 001 — Define the Exact Aggregate Window State Machine and Account-Key Derivation
+
+Status: complete at specification/authority level; no production implementation.
+
+Objective:
+
+Resolve the blocker found before rate-limit persistence by defining an implementable aggregate-only state machine, exact account-key HMAC framing, application results, temporal boundaries, retention, clearing, and linearizable concurrency without adding per-attempt history.
+
+Authority closed:
+
+- The accepted model is one fixed-start 15-minute window per pseudonymous account key, explicitly an approximation rather than an exact sliding window. Exact sliding history and bounded time buckets remain rejected by the minimum-data boundary.
+- State contains only versioned key digest, window start/end, a count capped at 10, latest state-changing update, exact 24-hour retention deadline, and positive version. The active interval is half-open; equality with window end permits verification.
+- Only password-verification outcome `invalid` records a failure. The tenth admitted invalid proof remains `AUTHENTICATION_FAILED` and makes later checks `RATE_LIMITED`; blocked checks do not verify, record, or extend state. Verification-required, malformed/CSRF-rejected requests, and infrastructure failures do not record. Only fully committed issuance clears.
+- The future application-owned port exposes only check, record-failure, and idempotent clear operations over a purpose-branded account digest and explicit times. Decisions are allowed or limited with exact retry time; the persisted count is not exposed. Infrastructure and out-of-order-time faults reject.
+- Record, check, clear, expired replacement, and absent creation are linearizable per key. Concurrent records cannot lose increments or exceed 10. Clear-last leaves no row; a failure linearized after clear creates a new count-1 window.
+- Version 1 HMAC input is exactly UTF-8 `sem-caderno/sign-in-rate-limit/v1`, one zero byte, and UTF-8 accepted normalized email, using the existing server-owned version-1 session key and complete HMAC-SHA-256 output. Application receives canonical 43-character unpadded base64url; persistence receives 32 bytes.
+- Rows are logically inactive at window-end equality, eligible for deletion then, and must be physically deleted by `retention_expires_at = updated_at + 24 hours`; equality is outside retention. A narrow bounded persistence cleanup operation is authorized for the implementation slice.
+
+Scope and consistency:
+
+- Updated only accepted documentation owning sign-in, application, persistence, architecture, transport, security/privacy, testing, task, and repository-status authority. ADR 0035 records the durable fixed-window/privacy tradeoff; no new ADR is required.
+- No application port, server HMAC function, PostgreSQL adapter, SQL, migration, dependency, lockfile, test, HTTP, cookie, issuance, authorization, telemetry, or product behavior is implemented.
+
+Validation and closure:
+
+- Pinned Node 24.19.0, Corepack 0.35.0, pnpm 11.20.0, and frozen offline installation passed without dependency or lockfile change. Documentation validation covered 63 Markdown files, 376 local links, and 109 tables; formatting passed.
+- The complete root validation passed: ESLint, every workspace type-check, seven-workspace architecture checks over 55 modules/52 dependencies, the controlled validator self-test, all builds, and five ordered migration checksums remained green.
+- Regression suites passed 207 tests: 81 contract, 25 application, 71 server, and 30 existing real-PostgreSQL persistence tests. Those PostgreSQL tests are regression evidence only; no rate-limit adapter, migration, or behavior was exercised or claimed.
+- No implementation Ralph loop was used. The authority closed in one documentation pass without a post-validation correction iteration. Browser/mobile/provider/deployment/product-validation and merchant testing remained not applicable.
+
 Recommended next cycle:
 
-Cycle 027 — Sign-In Rate-Limit Persistence Foundation.
+Cycle 028 — Sign-In Rate-Limit Persistence Foundation.
 
 Recommended next task:
 
@@ -3382,11 +3414,11 @@ Task 001 — Implement Account-Keyed Aggregate Failure Tracking and Clearing Bou
 
 Objective:
 
-Implement only the accepted versioned normalized-identity HMAC derivation and bounded PostgreSQL aggregate needed to record, evaluate, and clear the 10-failures-per-15-minutes sign-in limit before atomic session issuance.
+Implement the now-authoritative version-1 account-key derivation, application-owned check/record/clear boundary, minimal fixed-window PostgreSQL aggregate, bounded cleanup, and deterministic real-PostgreSQL concurrency coverage.
 
 Why next:
 
-Password verification and pre-session challenge persistence are now real. The remaining independent persistence prerequisite named by the accepted sign-in transaction is aggregate account-keyed rate state; implementing it next keeps failure accounting testable before combining it with session/authenticated-CSRF issuance.
+Cycle 027 resolves the only authority blocker that prevented the persistence slice. Password verification and pre-session challenge persistence are already executable, so rate state remains the smallest independent prerequisite before the complete issuance transaction.
 
 Explicit non-goals:
 

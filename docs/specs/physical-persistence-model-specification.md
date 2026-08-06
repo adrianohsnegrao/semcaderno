@@ -919,7 +919,7 @@ Cycle 023 authorizes no migration. The [Session Issuance and Sign-In Specificati
 - one `user_password_credentials` row per User containing only the Argon2id PHC verifier, timestamps, and positive version;
 - short-lived `pre_session_challenges` containing only keyed digest/version, creation, expiry, optional consumption, and positive version;
 - required authenticated-CSRF digest/version evidence for newly issued `sessions`, introduced through a reviewed compatibility migration;
-- aggregate `sign_in_rate_limits` keyed by normalized-identity digest with window timestamps, count, expiry, and positive version, never attempt history.
+- aggregate `sign_in_rate_limits` keyed by a unique versioned normalized-identity digest, with fixed window start/end, saturated count, latest state-changing update, exact retention deadline, and positive version, never attempt history.
 
 The issuance transaction must revalidate the User, consume the pre-session challenge, revoke only the prior presented session when present, insert the fresh digest-only session with null selected Business, record minimal safe audit evidence, and clear the aggregate rate bucket. It uses one explicit application-supplied issuance instant and no SQL current-time function. Exact migration names, compatibility/backfill mechanics, indexes, Argon package, and transaction implementation require implementation-cycle review.
 
@@ -938,3 +938,11 @@ The ordered `20260806000200-create-pre-session-challenges` migration creates `se
 The direct PostgreSQL adapter inserts only digest/lifecycle evidence and atomically consumes with one parameterized guarded update. Equality with expiry is rejected. Concurrent callers for one active digest produce exactly one successful update; later contenders observe consumed state and return the same negative outcome used for unknown or expired evidence. Connection, query, input-decoding, and persistence faults remain failures. No raw `p1` value, User/Business association, purpose column, origin class, request metadata, telemetry, retention job, session insertion, or authenticated-CSRF column is introduced.
 
 Real PostgreSQL 18.4 tests migrate from zero and prove migration history/checksums, exact columns, one-row/FK/chronology/version/algorithm constraints, real Argon2id verification, normalized lookup, dummy paths, malformed verifier rejection, and fail-closed database/verifier behavior. Hash creation remains test-fixture setup; production password creation and upgrade policy remain future work.
+
+## 40. Cycle 027 Rate-Limit Persistence Authority
+
+Cycle 027 authorizes a future `sem_caderno.sign_in_rate_limits` row with no surrogate identity: `account_key_version`, 32-byte `account_key_digest`, `window_started_at`, `window_ends_at`, `failure_count`, `updated_at`, `retention_expires_at`, and positive `version`. Version plus digest is the unique row identity. Logical constraints require supported key version 1, exact digest length, `window_ends_at = window_started_at + 15 minutes`, count between 1 and 10, `window_started_at <= updated_at < window_ends_at`, `retention_expires_at = updated_at + 24 hours`, and positive version.
+
+One linearizable transition creates, increments, saturates, or replaces the row from the caller's explicit instant. Reads never update it. Equality with window end is inactive; equality with retention expiry is outside retention. A successful issuance deletes the keyed row in its transaction, and absent clear is an idempotent no-op. Expired rows may be deleted after window end and must be physically deleted by retention expiry through a narrow bounded cleanup operation; no raw or normalized email, User foreign key, password evidence, attempt row, IP, agent, device, Business, authorization fact, or telemetry is stored.
+
+Exact physical names are authoritative above. The implementation cycle still owns PostgreSQL-native types, constraint/index names, parameterized SQL and locking technique, provided they realize these logical constraints and linearization semantics without changing them.
