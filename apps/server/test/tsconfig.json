@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../../tsconfig.node.json",
+  "compilerOptions": {
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "sourceMap": false,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["**/*.ts", "../src/**/*.ts"],
+  "references": [
+    { "path": "../../../packages/application" },
+    { "path": "../../../packages/contracts" },
+    { "path": "../../../packages/persistence-postgres" }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@sem-caderno/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@sem-caderno/application": "workspace:*",
+    "@sem-caderno/contracts": "workspace:*",
+    "@sem-caderno/persistence-postgres": "workspace:*",
+    "fastify": "5.11.2"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "12.1.0",
+    "@types/pg": "8.20.3",
+    "pg": "8.22.0"
+  }
+}

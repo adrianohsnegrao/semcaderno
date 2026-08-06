@@ -1,0 +1,52 @@
+{
+  "name": "sem-caderno",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=24.19.0 <25"
+  },
+  "scripts": {
+    "check:runtime": "node tools/check-runtime.mjs",
+    "docs:check": "node tools/check-docs.mjs",
+    "format": "prettier --write \"*.{json,yaml,yml,mjs,md}\" \"apps/**/*.{json,ts,tsx,css}\" \"packages/**/*.{json,ts}\" \"tools/**/*.{json,ts,mjs}\"",
+    "format:check": "prettier --check \"*.{json,yaml,yml,mjs,md}\" \"apps/**/*.{json,ts,tsx,css}\" \"packages/**/*.{json,ts}\" \"tools/**/*.{json,ts,mjs}\"",
+    "prepare:edge-types": "pnpm --filter @sem-caderno/application run build && pnpm --filter @sem-caderno/contracts run build && pnpm --filter @sem-caderno/persistence-postgres run build",
+    "lint": "pnpm run prepare:edge-types && eslint . --max-warnings 0",
+    "typecheck": "pnpm run prepare:edge-types && pnpm -r --if-present run typecheck",
+    "architecture:manifests": "node tools/check-architecture.mjs",
+    "architecture:dependencies": "depcruise --config dependency-cruiser.config.mjs apps packages tools/database",
+    "architecture:self-test": "node tools/check-architecture.mjs --self-test",
+    "architecture": "pnpm run architecture:manifests && pnpm run architecture:dependencies && pnpm run architecture:self-test",
+    "contract:test": "vitest run packages/contracts/test",
+    "application:test": "vitest run packages/application/test",
+    "mapping:test": "pnpm run prepare:edge-types && pnpm run build:database && vitest run apps/server/test",
+    "database:test": "pnpm run build:database && vitest run packages/persistence-postgres/test/session-resolution.postgres.test.ts",
+    "test": "pnpm run contract:test && pnpm run application:test && pnpm run mapping:test && pnpm run database:test && pnpm run test:architecture",
+    "test:architecture": "pnpm run architecture:self-test",
+    "build:contracts": "pnpm --filter @sem-caderno/contracts run build",
+    "build:packages": "pnpm -r --filter './packages/**' run build",
+    "build:server": "pnpm --filter @sem-caderno/server run build",
+    "build:web": "pnpm --filter @sem-caderno/web run build",
+    "build:database": "pnpm --filter @sem-caderno/database-migrations run build",
+    "build": "pnpm run build:packages && pnpm run build:server && pnpm run build:database && pnpm run build:web",
+    "migration:check": "pnpm --filter @sem-caderno/database-migrations run check",
+    "validate": "pnpm run check:runtime && pnpm run docs:check && pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run architecture && pnpm run test && pnpm run build && pnpm run migration:check",
+    "clean": "node tools/clean.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@next/eslint-plugin-next": "16.3.0",
+    "@types/node": "24.13.3",
+    "dependency-cruiser": "18.1.1",
+    "eslint": "9.39.5",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.9.0",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.66.0",
+    "vitest": "4.1.10"
+  }
+}

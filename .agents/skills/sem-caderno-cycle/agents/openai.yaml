@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Sem Caderno Cycle'
+  short_description: 'Disciplined Sem Caderno SDD cycle execution'
+  default_prompt: 'Use $sem-caderno-cycle to execute and close the requested Sem Caderno SDD cycle.'
