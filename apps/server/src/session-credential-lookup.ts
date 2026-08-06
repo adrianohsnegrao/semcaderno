@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 
-import type { SessionLookupKey } from '@sem-caderno/application';
+import type { SessionCredentialDigest, SessionLookupKey } from '@sem-caderno/application';
 
 const credentialPattern = /^v1\.([A-Za-z0-9_-]{43})$/;
 const lookupDomain = Buffer.from('sem-caderno/session-lookup/v1', 'utf8');
@@ -12,10 +12,10 @@ export const assertSessionHmacKey = (hmacKey: Uint8Array): void => {
   }
 };
 
-export const deriveSessionLookupKey = (
+const deriveSessionDigestBase64Url = (
   evidence: string,
   hmacKey: Uint8Array,
-): SessionLookupKey | undefined => {
+): string | undefined => {
   assertSessionHmacKey(hmacKey);
 
   const match = credentialPattern.exec(evidence);
@@ -32,11 +32,33 @@ export const deriveSessionLookupKey = (
     return undefined;
   }
 
-  const digestBase64Url = createHmac('sha256', hmacKey)
+  return createHmac('sha256', hmacKey)
     .update(lookupDomain)
     .update(separator)
     .update(credentialBytes)
     .digest('base64url');
+};
+
+export const deriveSessionLookupKey = (
+  evidence: string,
+  hmacKey: Uint8Array,
+): SessionLookupKey | undefined => {
+  const digestBase64Url = deriveSessionDigestBase64Url(evidence, hmacKey);
+  if (digestBase64Url === undefined) {
+    return undefined;
+  }
 
   return Object.freeze({ digestVersion: 1, digestBase64Url });
+};
+
+export const deriveSessionCredentialDigest = (
+  evidence: string,
+  hmacKey: Uint8Array,
+): SessionCredentialDigest | undefined => {
+  const digestBase64Url = deriveSessionDigestBase64Url(evidence, hmacKey);
+  if (digestBase64Url === undefined) {
+    return undefined;
+  }
+
+  return Object.freeze({ digestVersion: 1, digestBase64Url }) as SessionCredentialDigest;
 };

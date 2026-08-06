@@ -3469,3 +3469,47 @@ Password verification, pre-session challenge persistence, and rate-limit persist
 Explicit non-goals:
 
 - No complete sign-in coordinator or transaction, session/authenticated-CSRF migration, collision retry orchestration, session insertion, ID00/ID04 Fastify route, cookie writing, CSRF enforcement, authorization, product UI, provider, deployment, or merchant user testing.
+
+## Cycle 029 — Session and Authenticated-CSRF Evidence Generation Foundation
+
+### Task 001 — Implement Independent CSPRNG Evidence Generation and Versioned Digest Derivation
+
+Status: complete at implementation level; pending review and Git checkpoint.
+
+Implemented scope:
+
+- Added one server-owned generator that performs two independent Node `crypto.randomBytes(32)` calls and emits canonical `v1` session and `c1` authenticated-CSRF evidence.
+- Reused the accepted version-1 session-lookup and session-CSRF HMAC byte framing to return only the existing purpose-branded application digests. The construction-owned HMAC key is validated and privately copied.
+- Added only a direct optional byte source for deterministic cryptographic boundary tests. No generic token, randomness, strategy, or application-port abstraction was introduced.
+- Preserved all raw evidence at the server edge. No persistence, migration, HTTP, cookie, sign-in orchestration, collision retry, selected-Business, or authorization behavior was added.
+
+Validation evidence:
+
+- Fifteen focused server tests prove two separate 32-byte calls, exact versioned encoding, fixed HMAC vectors, purpose separation, canonical full-length output, malformed-version rejection, copied key ownership, default CSPRNG shape, and fail-closed redaction.
+- The complete repository validation passes 240 tests: 81 contract, 27 application, 89 server, and 43 real-PostgreSQL persistence tests. Formatting, documentation, lint, all workspace type-checks/builds, architecture validation/self-test, and six ordered migration checksums pass with no dependency manifest or lockfile change.
+- The bounded Ralph loop completed two meaningful iterations. Focused validation found no runtime defect; final evidence review then replaced an inward nominal-brand cast with direct construction from the shared digest bytes so the compile-time purpose boundary remains explicit. One initial command failure was only a missing generated-package prerequisite and did not count as a Ralph iteration.
+
+Deferred and not applicable:
+
+- Atomic issuance persistence, complete sign-in orchestration, collision retries, ID00/ID04 Fastify routes, cookies, final CSRF enforcement, authorization/Membership, product API/UI, mobile, provider, telemetry, deployment, and merchant testing remain deliberately deferred.
+- Browser/mobile/provider/deployment/accessibility/product-validation and merchant-testing gates are not applicable because no merchant-facing behavior exists.
+
+Recommended next cycle:
+
+Cycle 030 — Session Issuance Persistence Foundation.
+
+Recommended next task:
+
+Task 001 — Implement Atomic Digest-Only Session Issuance and Authenticated-CSRF Binding.
+
+Objective:
+
+Fulfill the existing `SessionIssuanceTransactionPort` with the minimum PostgreSQL schema and one atomic transaction that revalidates the User, consumes pre-session evidence, revokes only the prior presented session when supplied, inserts the fresh digest-only session/authenticated-CSRF binding, and clears rate state.
+
+Why next:
+
+Password verification, pre-session challenge persistence, rate-limit persistence, and independent session/authenticated-CSRF evidence generation are executable. The digest-only atomic issuance transaction is now the smallest remaining infrastructure prerequisite before sign-in orchestration or HTTP exposure.
+
+Explicit non-goals:
+
+- No complete sign-in coordinator, collision-retry orchestration, ID00/ID04 Fastify route, cookie writing, final protected-operation CSRF enforcement, authorization/Membership, product API/UI, mobile, provider, telemetry, deployment, or merchant user testing.

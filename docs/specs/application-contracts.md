@@ -335,6 +335,8 @@ Cycle 026 adds `PreSessionChallengePort` with only digest-only creation and one-
 
 Cycle 028 implements `SignInRateLimitPort` without adding orchestration. Its purpose-branded account key contains only digest version 1 and canonical digest text. `check(accountKey, evaluatedAt)` returns allowed or limited with the exact retry instant; `recordFailure(accountKey, occurredAt)` returns the post-record state for subsequent attempts; and idempotent `clear(accountKey)` removes aggregate state. Counts remain persistence-internal, instants remain explicit, and invalid input, temporal regression, decoding, connection, or query failure rejects rather than becoming allowed or limited. Future orchestration still owns which password-verification outcomes call the port and may clear only inside fully committed issuance.
 
+Cycle 029 requires no new application contract. The server generator reuses the existing purpose-branded `SessionCredentialDigest` and `AuthenticatedCsrfDigest` values accepted by `SessionIssuanceTransactionPort`; raw `v1` and `c1` evidence remains outside application. The byte source, Node crypto primitive, HMAC key, canonical evidence parser, and generated bearer result are server-owned and do not become application ports or exports.
+
 Refresh or revalidate session:
 
 - Purpose: determine whether session remains valid and whether active Business context still authorizes use.

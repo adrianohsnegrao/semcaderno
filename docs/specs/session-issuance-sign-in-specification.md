@@ -484,12 +484,18 @@ Cycle 028 implements `SignInRateLimitPort`, the exact server-owned version-1 acc
 
 The sixth ordered migration creates only the compound-keyed aggregate, exact lifecycle/count constraints, positive version, and retention cleanup index. Bounded cleanup accepts explicit time and limit but has no scheduler. Focused real PostgreSQL tests prove migration integrity, equality boundaries, no lost increments, cap 10, atomic expiry replacement, and both forced clear/record orderings. No sign-in coordinator, CSPRNG evidence generation, session insertion, authenticated-CSRF persistence, HTTP, cookie, or authorization behavior is added.
 
-## 24. Recommended Next Cycle
+## 24. Cycle 029 Evidence Generation Implementation Profile
 
-**Cycle 029 - Session and Authenticated-CSRF Evidence Generation Foundation**
+Cycle 029 adds one server-owned generator that performs separate Node `crypto.randomBytes(32)` calls for the session credential and authenticated-CSRF evidence. It emits only canonical `v1.` and `c1.` representations, privately copies the construction-owned version-1 HMAC key, and reuses the accepted session-lookup and session-CSRF digest derivations. Application receives only its existing purpose-branded version-1 full digests.
 
-**Task 001 - Implement Independent CSPRNG Evidence Generation and Versioned Digest Derivation**
+An optional direct byte source makes exact framing and independence deterministic in tests without introducing a generic random-service abstraction. Invalid source output, CSPRNG failure, and derivation failure reject with no raw evidence or secret detail. There is no persistence, migration, collision retry, sign-in transaction, route, cookie, selected-Business, authorization, or product behavior.
 
-Objective: implement the server-owned generation of fresh independent `v1` session and `c1` authenticated-CSRF evidence plus the already-specified purpose-separated digest derivation, without persistence or HTTP orchestration.
+## 25. Recommended Next Cycle
 
-Explicit non-goals: no complete sign-in coordinator or transaction, session/authenticated-CSRF migration, collision retry orchestration, session insertion, ID00/ID04 Fastify route, cookie writing, authorization, product UI, provider, deployment, or merchant testing.
+**Cycle 030 - Session Issuance Persistence Foundation**
+
+**Task 001 - Implement Atomic Digest-Only Session Issuance and Authenticated-CSRF Binding**
+
+Objective: fulfill the existing `SessionIssuanceTransactionPort` with the minimum PostgreSQL schema and one atomic transaction that revalidates the User, consumes pre-session evidence, revokes only the prior presented session when supplied, inserts the fresh digest-only session/authenticated-CSRF binding, and clears rate state.
+
+Explicit non-goals: no complete sign-in coordinator, collision-retry orchestration, ID00/ID04 Fastify route, cookie writing, final protected-operation CSRF enforcement, authorization, product UI, provider, deployment, or merchant testing.
