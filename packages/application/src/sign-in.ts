@@ -159,6 +159,7 @@ export type IssueSessionInput = Readonly<{
   userId: string;
   issuedAt: Date;
   expiresAt: Date;
+  signInRateLimitAccountKey: SignInRateLimitAccountKey;
   sessionCredentialDigest: SessionCredentialDigest;
   preSessionCsrfDigest: PreSessionCsrfDigest;
   authenticatedCsrfDigest: AuthenticatedCsrfDigest;
@@ -166,10 +167,17 @@ export type IssueSessionInput = Readonly<{
 }>;
 
 export type IssuedSession = Readonly<{
+  outcome: 'issued';
   userId: string;
   expiresAt: Date;
 }>;
 
+export type SessionIssuanceResult =
+  | IssuedSession
+  | Readonly<{ outcome: 'userRejected' }>
+  | Readonly<{ outcome: 'preSessionChallengeRejected' }>
+  | Readonly<{ outcome: 'digestCollision' }>;
+
 export interface SessionIssuanceTransactionPort {
-  issue(input: IssueSessionInput): Promise<IssuedSession>;
+  issue(input: IssueSessionInput): Promise<SessionIssuanceResult>;
 }

@@ -276,18 +276,39 @@ This is the existing fixed absolute expiry. Equality with `expiresAt` is expired
 
 ### 7.4 Atomic persistence and fixation resistance
 
-One transaction must:
+`IssueSessionInput` carries only `userId`, `issuedAt`, `expiresAt`, the versioned session/pre-session-CSRF/authenticated-CSRF digests, the versioned `SignInRateLimitAccountKey`, and the optional prior-session credential digest. The server derives the account key from the already-normalized email before calling the transaction. Application and persistence receive no raw or normalized email and must not attempt to derive the key from User or session rows.
 
-1. lock/revalidate the verified User as usable and email-verified;
-2. revalidate and consume the pre-session CSRF challenge;
-3. revoke the exact prior active session represented by the strictly parsed incoming configured cookie, when present;
-4. insert the fresh session with session digest, authenticated CSRF digest, User, null selected Business, explicit timestamps, and version 1;
-5. complete minimal sign-in success audit evidence without any bearer or password material;
-6. clear the rate-limit bucket.
+One transaction must perform these steps in order:
 
-The new session never reuses, adopts, updates, or derives from an incoming credential. A missing or malformed incoming cookie supplies no prior digest. Ordinary sign-in revokes only the session presented by this browser; other device sessions remain active. If any transaction step fails, no new session is authoritative, no pre-session challenge is consumed, no prior session is revoked, and no cookie or authenticated CSRF token is returned.
+1. acquire the same transaction-scoped per-account advisory serialization used by `SignInRateLimitPort` for the supplied complete account-key digest;
+2. lock/revalidate the verified User as existing, enabled, and email-verified;
+3. revalidate and consume the pre-session CSRF challenge at `issuedAt`;
+4. revoke the exact prior active session represented by the strictly parsed incoming configured cookie, when present;
+5. insert the fresh session with both digest pairs, User, null selected Business, explicit timestamps, and version 1;
+6. insert exactly one minimal `session_issued`/`succeeded` audit row at `issuedAt`;
+7. delete the supplied rate-limit account-key row;
+8. commit.
+
+The account advisory-lock identity is the signed big-endian 64-bit value from the first eight bytes of the complete decoded account-key digest, matching the Cycle 028 adapter. Advisory collisions may serialize unrelated keys but never merge them because deletion still matches the complete version and 32-byte digest. This lock is acquired before User/challenge/session locks, making rate `recordFailure` versus issuance clear linearizable without a second lock protocol.
+
+The new session never reuses, adopts, updates, or derives from an incoming credential. A missing or malformed incoming cookie supplies no prior digest. A supplied prior digest revokes that exact active row when found; no matching active row is an idempotent no-op. Ordinary sign-in revokes only the session presented by this browser; other device sessions remain active. `expiresAt` must equal `issuedAt + 43,200 seconds`; invalid or non-finite instants are internal input failure, not an expected result.
 
 The new session starts with `selected_business_id = NULL`. ID10 and BS02 own accessible-Business discovery and validated selection. No Membership or capability is cached during issuance.
+
+### 7.5 Issuance results and rollback
+
+`SessionIssuanceTransactionPort.issue()` returns exactly one discriminated `SessionIssuanceResult`:
+
+| Outcome | Meaning | Transaction effect | Later orchestration |
+| --- | --- | --- | --- |
+| `issued` with User and expiry | Every step committed | All seven writes/checks above are authoritative | Return success evidence and cookie |
+| `userRejected` | Locked User is missing, disabled, or no longer email-verified | Roll back; no challenge consumption, revocation, insertion, audit, or rate clear | Generic authentication failure; no account-state disclosure |
+| `preSessionChallengeRejected` | Challenge is unknown, expired including equality, or already consumed | Roll back with the three states deliberately indistinguishable | `CSRF_REJECTED`; no cookie/token |
+| `digestCollision` | The new session credential digest or authenticated-CSRF digest conflicts with its named uniqueness constraint | Roll back every transaction effect | Discard both raw values and retry with two fresh values |
+
+Only those two new-digest uniqueness conflicts produce `digestCollision`. Classification uses structured PostgreSQL error code plus reviewed constraint identity, never error-message text. The server edge owns retry because only it owns raw evidence and generation: one initial attempt plus at most two retries, three total. Every collision discards and regenerates both raw values even if only one digest collided. User/challenge rejection is not retried. Collision exhaustion and every connection, query, transaction, decoding, timestamp, audit, foreign-key, check, or unexpected uniqueness failure reject as internal failure.
+
+An expected result is returned only after its transaction has rolled back successfully. If rollback itself fails, the promise rejects as infrastructure failure. No result other than `issued` permits public session or authenticated-CSRF evidence.
 
 ## 8. Cookie Writing
 
@@ -338,18 +359,27 @@ No migration is created now. Future implementation is authorized to add only the
 
 - `user_password_credentials`: one row per User with Argon2id PHC verifier, timestamps, and positive version; restrictive User foreign key;
 - `pre_session_challenges`: keyed digest/version, creation, expiry, optional consumed instant, and positive version; no identity or Business required;
-- `sessions`: authenticated CSRF digest/version columns, both required for newly issued sessions under an expand-and-contract rollout;
+- `sessions`: nullable `authenticated_csrf_digest_version smallint` and `authenticated_csrf_digest bytea` columns introduced as an all-null or complete pair, with supported version 1, exact 32-byte length, and uniqueness among complete pairs;
 - `sign_in_rate_limits`: unique versioned account-key digest, fixed window start/end, saturated failure count, last state-changing update, exact retention deadline, and positive version; aggregate only, not attempt history.
+- `audit_events`: the first executable profile contains only UUIDv7 `id`, restrictive non-null `actor_user_id`, fixed `action_code = 'session_issued'`, fixed `outcome_code = 'succeeded'`, and non-null `occurred_at`.
 
-The existing session credential columns and constraints remain authoritative. Migration order, compatibility for existing Cycle 019 test rows, backfill/default strategy, exact index names, and credential-library dependency version must be reviewed in the implementation cycle. Raw password, raw session credential, raw CSRF value, HMAC key, IP, user agent, device, location, login history, arbitrary metadata, and authorization cache are prohibited.
+The issuance migration is additive and supplies no default or backfill for authenticated-CSRF evidence. Existing sessions remain `NULL`/`NULL`; they stay valid for current-session inspection and other read-only authentication until ordinary expiry or revocation, but absence of the binding rejects every unsafe authenticated operation with `CSRF_REJECTED`. It also rejects authenticated-CSRF replenishment: the browser must establish a newly issued session rather than adopting fabricated evidence. Every Cycle 031 issuance insert must supply a complete non-null pair. The current reader ignores the new columns, so the additive schema may precede the writer and remains compatible with rollback to the current inspection runtime.
+
+The migration creates one partial unique index over authenticated-CSRF version/digest where the version is non-null. A later separately reviewed contract migration may validate that no null pairs remain and set both columns non-null only after all legacy sessions have expired, been revoked, or been removed and every writer requires the pair. It must not fabricate, derive, or backfill raw authenticated-CSRF evidence for historical sessions.
+
+The minimal audit row is inserted in the issuance transaction with `actor_user_id = userId` and `occurred_at = issuedAt`; its two codes are migration-constrained constants. It has no session reference, Business, correlation, metadata, reason, IP, agent, device, email, password, bearer, digest, or key. The issuance adapter exposes insert only; update/delete and a general audit/event framework remain unauthorized. Retention policy for this new security audit category requires later operational/legal authority and does not permit ordinary runtime deletion now.
+
+The existing session credential columns and constraints remain authoritative. Raw password, raw session credential, raw CSRF value, HMAC key, IP, user agent, device, location, login history, arbitrary metadata, and authorization cache are prohibited.
 
 ## 11. Failure and Logging Boundary
 
 Invalid proof is an expected authentication outcome. CSRF rejection, rate limiting, email-verification requirement, validation failure, and internal failure remain distinct. No broad catch may turn configuration, CSPRNG, HMAC, Argon2, PostgreSQL, transaction, mapping, or serialization failure into 401, 201, or anonymous success.
 
+Within issuance, `userRejected` maps to the same generic authentication failure as other unusable-User proof paths, and `preSessionChallengeRejected` maps to `CSRF_REJECTED`. `digestCollision` is internal retry control and never a public error identity. Rejected infrastructure remains a safe `INTERNAL_FAILURE` if it reaches HTTP.
+
 Public failures expose only allow-listed Problem Details and an independent correlation identifier. They never expose email existence, disabled state, verifier/hash/parameters, password, session/CSRF evidence, HMAC input/key/digest, SQL, constraint, retry counter, stack, provider detail, or transaction state.
 
-Minimal security audit may record sign-in success and aggregate suspicious failure state using User reference only when known safely, timestamp, outcome category, and correlation reference. It is not login history. Passwords, hashes, raw or digested bearer evidence, normalized-email rate keys, request bodies, IPs, user agents, and device metadata are excluded.
+The initial mandatory security audit records only committed sign-in success using the exact Cycle 030 row. Broader suspicious-failure audit, correlation, metadata, and additional categories remain deferred until their security value and retention are accepted. It is not login history. Passwords, hashes, raw or digested bearer evidence, normalized-email rate keys, request bodies, IPs, user agents, and device metadata are excluded.
 
 ## 12. Authorization Boundary
 

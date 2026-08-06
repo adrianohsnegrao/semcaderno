@@ -16,6 +16,7 @@ export {
   type PreSessionChallengePort,
   type PreSessionCsrfDigest,
   type SessionCredentialDigest,
+  type SessionIssuanceResult,
   type SessionIssuanceTransactionPort,
   type SignInRateLimitAccountKey,
   type SignInRateLimitDecision,

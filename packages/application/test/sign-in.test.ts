@@ -12,6 +12,7 @@ import {
   type PreSessionChallengePort,
   type PreSessionCsrfDigest,
   type SessionCredentialDigest,
+  type SessionIssuanceResult,
   type SessionIssuanceTransactionPort,
   type SignInRateLimitAccountKey,
   type SignInRateLimitDecision,
@@ -246,6 +247,10 @@ describe('digest-only session issuance application port', () => {
     digestVersion: 1,
     digestBase64Url: 'wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww',
   }) as AuthenticatedCsrfDigest;
+  const signInRateLimitAccountKey = Object.freeze({
+    digestVersion: 1,
+    digestBase64Url: 'rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr',
+  }) as SignInRateLimitAccountKey;
 
   it('passes only digest evidence and explicit lifecycle instants to issuance', async () => {
     const issuedAt = new Date('2026-08-06T00:00:00Z');
@@ -254,12 +259,17 @@ describe('digest-only session issuance application port', () => {
       userId: 'user-synthetic-issuance-001',
       issuedAt,
       expiresAt,
+      signInRateLimitAccountKey,
       sessionCredentialDigest,
       preSessionCsrfDigest,
       authenticatedCsrfDigest,
       priorSessionCredentialDigest,
     });
-    const result: IssuedSession = Object.freeze({ userId: input.userId, expiresAt });
+    const result: IssuedSession = Object.freeze({
+      outcome: 'issued',
+      userId: input.userId,
+      expiresAt,
+    });
     const calls: IssueSessionInput[] = [];
     const issuance: SessionIssuanceTransactionPort = {
       issue(received) {
@@ -277,6 +287,7 @@ describe('digest-only session issuance application port', () => {
       'preSessionCsrfDigest',
       'priorSessionCredentialDigest',
       'sessionCredentialDigest',
+      'signInRateLimitAccountKey',
       'userId',
     ]);
     expect('selectedBusinessId' in input).toBe(false);
@@ -284,8 +295,35 @@ describe('digest-only session issuance application port', () => {
     expect('csrfToken' in input).toBe(false);
     expectTypeOf(sessionCredentialDigest).not.toEqualTypeOf(preSessionCsrfDigest);
     expectTypeOf(preSessionCsrfDigest).not.toEqualTypeOf(authenticatedCsrfDigest);
+    expectTypeOf(signInRateLimitAccountKey).not.toEqualTypeOf(sessionCredentialDigest);
     expect(issuedAt.toISOString()).toBe('2026-08-06T00:00:00.000Z');
     expect(expiresAt.toISOString()).toBe('2026-08-06T12:00:00.000Z');
+  });
+
+  it('keeps expected rejections and retryable digest collision distinct from failure', async () => {
+    const results: SessionIssuanceResult[] = [
+      Object.freeze({ outcome: 'userRejected' }),
+      Object.freeze({ outcome: 'preSessionChallengeRejected' }),
+      Object.freeze({ outcome: 'digestCollision' }),
+    ];
+    const issuance: SessionIssuanceTransactionPort = {
+      issue: () => Promise.resolve(results.shift()!),
+    };
+    const input: IssueSessionInput = Object.freeze({
+      userId: 'user-synthetic-issuance-002',
+      issuedAt: new Date('2026-08-06T00:00:00Z'),
+      expiresAt: new Date('2026-08-06T12:00:00Z'),
+      signInRateLimitAccountKey,
+      sessionCredentialDigest,
+      preSessionCsrfDigest,
+      authenticatedCsrfDigest,
+    });
+
+    await expect(issuance.issue(input)).resolves.toEqual({ outcome: 'userRejected' });
+    await expect(issuance.issue(input)).resolves.toEqual({
+      outcome: 'preSessionChallengeRejected',
+    });
+    await expect(issuance.issue(input)).resolves.toEqual({ outcome: 'digestCollision' });
   });
 
   it('propagates issuance infrastructure failure without creating an issued result', async () => {
@@ -298,9 +336,10 @@ describe('digest-only session issuance application port', () => {
 
     await expect(
       issuance.issue({
-        userId: 'user-synthetic-issuance-002',
+        userId: 'user-synthetic-issuance-003',
         issuedAt: new Date('2026-08-06T00:00:00Z'),
         expiresAt: new Date('2026-08-06T12:00:00Z'),
+        signInRateLimitAccountKey,
         sessionCredentialDigest,
         preSessionCsrfDigest,
         authenticatedCsrfDigest,

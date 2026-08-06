@@ -16,6 +16,10 @@ Use normalized primary email plus a locally verified password as the initial MVP
 
 After successful verification, the server security edge independently generates fresh opaque session and authenticated CSRF evidence, derives only versioned keyed digests, and passes digest-only issuance intent plus one explicit instant inward. One application-owned transaction port revalidates the User, consumes pre-session CSRF evidence, revokes only the prior session presented by this browser, inserts the new 12-hour session with no selected Business, records minimal safe audit evidence, and clears aggregate rate state. Raw session evidence exists only in the protected cookie; raw CSRF evidence exists only in ephemeral browser memory and the custom header.
 
+The issuance intent includes the already-derived purpose-branded sign-in rate-limit account key so persistence can clear that digest-only aggregate in the same transaction without receiving or reconstructing normalized identity. The transaction returns a closed application result: issued, unusable User revalidation, rejected pre-session challenge, or retryable issuance-digest collision. Only named uniqueness conflicts for the new session credential digest or authenticated-CSRF digest are retryable; the server edge that owns raw evidence regenerates both values for at most three total issuance attempts. PostgreSQL, transaction, decoding, and every other constraint failure remain rejected infrastructure failures.
+
+The first issuance migration follows expand-and-contract. It adds nullable authenticated-CSRF digest/version columns as an all-null or complete version-1 pair, a partial uniqueness guarantee for complete pairs, and one minimal append-only sign-in-success audit table. Historical sessions remain inspectable until ordinary expiry or revocation but have no authenticated-CSRF authority for unsafe operations; no historical token is fabricated. Every newly issued session supplies the complete pair. A later reviewed contract migration may require non-null columns only after legacy null rows are gone and every writer enforces the pair.
+
 Password verification uses reviewed Argon2id PHC verifiers and equivalent dummy work for unknown identities. Invalid proof and disabled/unknown identity are publicly generic; infrastructure failure remains failure. Authentication proves global User identity only and performs no Business or Membership authorization.
 
 Sign-in abuse state uses a pseudonymous account key and one fixed-start 15-minute aggregate window with a counter capped at 10. It is explicitly not an exact sliding window: preserving exact sliding semantics would require per-attempt timestamps or buckets that violate the accepted minimum-data boundary. The server derives the account key with the version-1 session HMAC key, the distinct sign-in-rate domain, one zero separator, and the normalized-email UTF-8 bytes; application and persistence receive only the versioned digest.
@@ -28,6 +32,8 @@ Sign-in abuse state uses a pseudonymous account key and one fixed-start 15-minut
 - Successful authentication always replaces the browser's presented session with independent evidence, preventing credential adoption/fixation.
 - A fixed 12-hour absolute session avoids idle/sliding write complexity in the first profile.
 - Authenticated CSRF remains a distinct session-bound synchronizer value and cannot become authentication or authorization evidence.
+- Expected challenge or User revalidation rejection rolls back without issuance; digest collision has one narrow typed retry path; infrastructure failure never enters either expected result.
+- Sign-in success audit is one User reference, fixed action/outcome codes, and the issuance instant only; it is not login history or a generic event payload.
 - The tenth admitted invalid proof closes its fixed window to later verification attempts; equality with the window end reopens verification, and only committed issuance clears the row.
 - Local password verification creates breach-response and hashing-parameter obligations that must be reviewed operationally before production.
 
@@ -58,5 +64,5 @@ This ADR specializes ADRs 0020, 0023, 0034, and the identity/session operation f
 
 - Implement ID00/ID04 contract schemas and application-owned verification/issuance boundaries.
 - Select and audit the exact Argon2 package/version before adding it.
-- Add the remaining session-CSRF and fixed-window aggregate-rate migrations.
+- Add the reviewed session-CSRF compatibility and minimal sign-in-success audit migration, then implement the atomic issuance transaction.
 - Implement Fastify sign-in/cookie writing and authenticated CSRF enforcement only after the inner boundaries are green.

@@ -3513,3 +3513,49 @@ Password verification, pre-session challenge persistence, rate-limit persistence
 Explicit non-goals:
 
 - No complete sign-in coordinator, collision-retry orchestration, ID00/ID04 Fastify route, cookie writing, final protected-operation CSRF enforcement, authorization/Membership, product API/UI, mobile, provider, telemetry, deployment, or merchant user testing.
+
+## Cycle 030 — Session Issuance Persistence Semantics Closure
+
+### Task 001 — Define Atomic Issuance Outcomes, Rate-Key Input, Audit Evidence, Collision Signaling, and Compatibility Migration
+
+Status: complete at authority and application-contract level; no PostgreSQL issuance implementation.
+
+Authority closed:
+
+- `IssueSessionInput` now requires the purpose-branded `SignInRateLimitAccountKey` already derived by the server from normalized email. The atomic adapter receives only its versioned digest and uses the same Cycle 028 per-key serialization before clearing the exact aggregate.
+- `SessionIssuanceResult` distinguishes committed `issued`, generic locked-User `userRejected`, uniform unknown/expired/consumed `preSessionChallengeRejected`, and retryable `digestCollision`. Infrastructure, rollback, decoding, temporal, and unrelated constraint failures reject rather than becoming expected outcomes.
+- Only named uniqueness conflicts for the newly inserted session credential digest or authenticated-CSRF digest produce `digestCollision`. The server evidence owner discards both values and performs at most three total transaction attempts; no other database failure is retried.
+- One mandatory sign-in success audit row contains only UUID, restrictive User reference, fixed `session_issued`/`succeeded` codes, and `issuedAt`. It is inserted atomically, is append-only at the adapter boundary, and contains no session reference, bearer/digest/key, identity text, Business, request metadata, correlation, or analytics payload.
+- The next additive migration introduces an all-null or complete version-1 32-byte authenticated-CSRF pair with partial uniqueness and no default/backfill, plus the minimal audit table. Historical null-pair sessions remain inspectable/read-only until expiry or revocation but reject unsafe authenticated operations and replenishment. New issuance requires the complete pair; only a later reviewed contract migration may enforce non-null after legacy rows are gone.
+
+Transaction and failure semantics:
+
+- One transaction acquires the existing rate-key advisory serialization, locks/revalidates User, consumes the challenge, conditionally revokes only the presented active session, inserts the new session/CSRF pair, inserts audit evidence, clears the rate row, and commits. No matching prior session or rate row is an idempotent no-op.
+- User/challenge/collision results are returned only after successful rollback. Any failed step or rollback preserves the challenge, prior session, rate aggregate, and absence of new session/audit authority. Only `issued` permits later cookie/CSRF publication.
+- No SQL, migration, persistence adapter, CSPRNG retry loop, sign-in coordinator, HTTP route, cookie, middleware, authorization, UI, dependency, or runtime behavior is implemented in this closure.
+
+Validation evidence:
+
+- Pinned Node 24.19.0/Corepack 0.35.0/pnpm 11.20.0 and frozen offline installation passed without manifest or lockfile change. Documentation validation covered 63 Markdown files, 376 local links, and 110 tables; formatting passed.
+- The complete repository gate passed 241 tests: 81 contract, 28 application, 89 server, and 43 existing real-PostgreSQL persistence regressions. The PostgreSQL suites do not claim the still-unimplemented issuance transaction.
+- Lint, every workspace type-check/build, architecture validation over 62 modules and 63 dependencies, validator self-test, and six ordered migration checksums passed. One focused test initially failed only because its expected property list used the wrong lexical order; correcting the assertion changed no contract semantics.
+
+Recommended next cycle:
+
+Cycle 031 — Session Issuance Persistence Foundation.
+
+Recommended next task:
+
+Task 001 — Implement Atomic Digest-Only Session Issuance and Authenticated-CSRF Binding.
+
+Objective:
+
+Implement the now-executable additive migration and `SessionIssuanceTransactionPort` PostgreSQL adapter with the exact typed outcomes, named collision classification, atomic audit/rate/session/challenge behavior, compatibility profile, and deterministic real-PostgreSQL rollback/concurrency evidence.
+
+Why next:
+
+Cycle 030 closes every authority gap found by the blocked implementation attempt. Password verification, challenge consumption, rate persistence, and independent evidence generation are already executable; atomic issuance persistence is again the smallest unblocked prerequisite before complete sign-in orchestration.
+
+Explicit non-goals:
+
+- No complete sign-in coordinator, server collision-retry loop, ID00/ID04 Fastify route, cookie writing, protected-operation CSRF middleware, authorization/Membership, product API/UI, mobile, provider, telemetry, deployment, cleanup scheduler, or merchant user testing.
