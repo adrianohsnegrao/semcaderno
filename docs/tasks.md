@@ -3608,3 +3608,51 @@ Every persistence and cryptographic prerequisite is now executable. The server-o
 Explicit non-goals:
 
 - No ID00/ID04 Fastify route, cookie writing, protected-operation CSRF middleware, authorization/Membership, product API/UI, mobile, provider, telemetry, deployment, or merchant user testing.
+
+## Cycle 032 — Sign-In Orchestration Foundation
+
+### Task 001 — Implement Rate-Limited Credential Verification and Three-Attempt Atomic Session Issuance Coordination
+
+Status: complete in the uncommitted Cycle 032 implementation worktree; review and Git closure remain separate.
+
+Implemented scope:
+
+- Added one internal server-owned sign-in operation with no package-root export, Fastify request/reply, cookie, SQL, Pool, or transport mapping.
+- The operation receives transport-validated email/password values, purpose-branded pre-session and optional prior-session digests, and one explicit issuance instant. It copies the HMAC key at construction, normalizes email once, derives the existing rate account key, and derives the exact 12-hour expiry without an ambient clock.
+- Rate check runs before password verification. A limited decision prevents Argon2 work; only verifier outcome `invalid` records failure, and the current invalid proof remains generic authentication failure even when its post-record state is limited. Verification-required does not count or issue.
+- Verified proof generates both independent bearer values and invokes atomic issuance. `issued`, `userRejected`, and `preSessionChallengeRejected` terminate without retry. Only explicit `digestCollision` regenerates both values, with one initial attempt plus two retries. Exhaustion, malformed runtime results, and infrastructure failure reject.
+- Success publishes only the committed User/expiry plus fresh session and authenticated-CSRF evidence. It verifies the committed identity/lifetime before publication and exposes no digest, HMAC key, password, normalized email, PostgreSQL detail, selected Business, Membership, capability, or authorization claim.
+
+Focused evidence:
+
+- Twenty server tests cover successful order/input/output, limited short circuit, invalid recording at threshold, verification-required behavior, User/challenge mapping, three-attempt regeneration, collision exhaustion, fail-closed unknown verifier/rate/issuance outcomes, infrastructure propagation, CSPRNG failure, committed-result validation, input validation, key copying, non-mutation, and raw-evidence exclusion from issuance calls.
+- Existing Cycle 025, 028, and 031 real-PostgreSQL suites remain authoritative for actual Argon2, aggregate concurrency, transaction rollback, collision classification, and digest-only persistence. This cycle adds no fake PostgreSQL claim.
+- Definitive checkpoint validation passed 278 tests: 81 contract, 28 application, 109 server, and 60 real-PostgreSQL persistence regressions.
+
+Ralph evidence:
+
+- Three meaningful iterations were used. Iteration 1 implemented the coordinator and 16 focused tests; validation found two expected known-answer digests in the test were incorrect, and correcting only those vectors reached GREEN. Evidence review then found an unknown runtime issuance outcome could fall into retry control; iteration 2 added exhaustive verifier/issuance guards plus two tests and reached 18 focused tests. Checkpoint review found an unknown rate decision with a valid retry instant could bypass the intended closed union; iteration 3 added the explicit rate-outcome guard and two tests. Type-inference and lint corrections were mechanical and changed no behavior.
+
+Deferred and not applicable:
+
+- Pre-session CSPRNG/bootstrap HTTP, ID04 Fastify mapping, cookie writing, Origin/Referer/Fetch Metadata enforcement, authenticated-operation CSRF, authorization/Membership, product API/UI, mobile, provider, telemetry, deployment, and merchant testing remain deliberately deferred.
+
+Recommended next cycle:
+
+Cycle 033 — Pre-Session Bootstrap HTTP Foundation.
+
+Recommended next task:
+
+Task 001 — Implement Independent Pre-Session CSRF Generation and `GET /api/v1/session-bootstrap`.
+
+Objective:
+
+Generate one fresh canonical `p1` value with the accepted Node CSPRNG, persist only its purpose-separated digest and exact ten-minute lifecycle through the existing application/PostgreSQL boundary, and expose the stable no-store ID00 response through Fastify without implementing ID04 or writing a cookie.
+
+Why next:
+
+The sign-in coordinator is executable, but a browser cannot obtain the pre-session evidence it requires. ID00 is the smallest independent HTTP prerequisite and can reuse the existing contract, digest derivation, lifecycle use case, persistence adapter, server configuration, and safe error boundary before the state-changing ID04 route is exposed.
+
+Explicit non-goals:
+
+- No ID04 sign-in route, session cookie writing, complete browser login journey, authenticated-operation CSRF, authorization/Membership, product API/UI, mobile, provider, telemetry, deployment, or merchant user testing.

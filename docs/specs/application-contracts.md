@@ -341,6 +341,8 @@ Cycle 030 closes the issuance result and transaction input. `IssueSessionInput` 
 
 Cycle 031 fulfills this unchanged application-owned port in PostgreSQL infrastructure. The adapter validates only canonical versioned digests and explicit lifecycle instants, returns the closed expected outcomes after committed transaction or successful rollback, and keeps PostgreSQL codes, constraint names, rows, locks, and transaction state behind the port. It adds no coordinator, CSPRNG, raw evidence, HTTP, cookie, or authorization contract.
 
+Cycle 032 changes no application port. One server-owned coordinator invokes `SignInRateLimitPort`, `PasswordVerificationPort`, and `SessionIssuanceTransactionPort` in the accepted order. It derives the account key outside application, passes only purpose-branded digests inward, ignores the post-record limited decision for the current invalid proof, and retries only the explicit `digestCollision` result with fresh server-owned evidence. Unknown runtime outcomes reject rather than being treated as collisions. The coordinator's success result contains the committed User/expiry plus raw session/authenticated-CSRF evidence for later transport; no application or browser-safe export gains those bearers.
+
 Refresh or revalidate session:
 
 - Purpose: determine whether session remains valid and whether active Business context still authorizes use.

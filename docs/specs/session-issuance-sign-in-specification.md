@@ -526,12 +526,18 @@ Cycle 031 adds the ordered `20260806000400-add-session-issuance-foundation` migr
 
 One transaction uses the accepted rate-key advisory lock and exact operation order. Real PostgreSQL evidence proves committed success, expected rejection rollback, both named digest collisions, unrelated and late infrastructure failure rollback, absent-row no-ops, one challenge winner, and both rate-record/issuance-clear linearization orders. The adapter owns no raw evidence, key, CSPRNG, retry loop, coordinator, HTTP, or cookie behavior.
 
-## 26. Recommended Next Cycle
+## 26. Cycle 032 Sign-In Orchestration Implementation Profile
 
-**Cycle 032 - Sign-In Orchestration Foundation**
+Cycle 032 adds one internal server-owned operation. Its input is the accepted email and NFC-normalized password, purpose-branded pre-session and optional prior-session digests prepared by the server edge, and one explicit issuance instant. Construction validates and copies the HMAC key. Execution normalizes email, derives the version-1 rate key, checks the aggregate before verification, and records only verifier outcome `invalid` at the same instant. A limited check prevents verifier work; the tenth admitted invalid proof remains the current generic authentication failure even when recording returns a limited post-state.
 
-**Task 001 - Implement Rate-Limited Credential Verification and Three-Attempt Atomic Session Issuance Coordination**
+Verified proof derives the exact 12-hour expiry and generates independent session/authenticated-CSRF evidence for each transaction attempt. `issued`, `userRejected`, and `preSessionChallengeRejected` terminate immediately with their safe coordinator result. Only `digestCollision` causes another complete generation, up to three total attempts; exhaustion and every unknown result or infrastructure failure reject. The operation publishes raw generated evidence only with an exact committed User/expiry match and exposes no digest, key, password, PostgreSQL detail, selected Business, Membership, authorization, HTTP, or cookie behavior.
 
-Objective: compose the executable normalization, password verification, rate-limit, pre-session challenge, evidence generation, and atomic issuance boundaries into one server-owned sign-in operation with the accepted expected-outcome mapping and at most three complete evidence attempts, without HTTP or cookie writing.
+## 27. Recommended Next Cycle
 
-Explicit non-goals: no ID00/ID04 Fastify route, cookie writing, protected-operation CSRF middleware, authorization, product UI, provider, deployment, or merchant testing.
+**Cycle 033 - Pre-Session Bootstrap HTTP Foundation**
+
+**Task 001 - Implement Independent Pre-Session CSRF Generation and `GET /api/v1/session-bootstrap`**
+
+Objective: generate one fresh canonical `p1` value with the accepted CSPRNG, persist only its purpose-separated digest and exact ten-minute lifecycle through the existing boundary, and expose the stable no-store ID00 response through Fastify without sign-in POST or cookie writing.
+
+Explicit non-goals: no ID04 route, sign-in cookie, authenticated-CSRF enforcement, authorization, product UI, provider, deployment, or merchant testing.
