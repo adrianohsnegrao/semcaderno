@@ -3559,3 +3559,52 @@ Cycle 030 closes every authority gap found by the blocked implementation attempt
 Explicit non-goals:
 
 - No complete sign-in coordinator, server collision-retry loop, ID00/ID04 Fastify route, cookie writing, protected-operation CSRF middleware, authorization/Membership, product API/UI, mobile, provider, telemetry, deployment, cleanup scheduler, or merchant user testing.
+
+## Cycle 031 — Session Issuance Persistence Foundation
+
+### Task 001 — Implement Atomic Digest-Only Session Issuance and Authenticated-CSRF Binding
+
+Status: complete in the uncommitted Cycle 031 implementation worktree; review and Git closure remain separate.
+
+Implemented scope:
+
+- Added ordered migration `20260806000400-add-session-issuance-foundation`, bringing the migration set to seven while leaving migrations 1–6 unchanged.
+- Added nullable authenticated-CSRF version/digest columns as an all-null or complete version-1 32-byte pair with named partial uniqueness and no default or backfill. Historical sessions remain null-pair compatible with current read-only inspection.
+- Added the minimal `audit_events` profile containing only UUIDv7 identity, restrictive User reference, fixed `session_issued`/`succeeded` codes, and the explicit occurrence instant.
+- Added `PostgresSessionIssuanceAdapter`, which validates canonical digests and the exact 12-hour lifecycle before using one transaction to acquire the rate account lock, revalidate User, consume the challenge, revoke the exact prior active session when present, insert the new digest-only session/CSRF binding, insert audit evidence, and clear rate state.
+- Expected User/challenge outcomes and the two named new-digest collisions return only after rollback. Structured PostgreSQL code plus constraint identity classifies those collisions; unrelated uniqueness, database, temporal, transaction, and rollback failures reject through the fixed infrastructure boundary.
+- The adapter owns no raw evidence, HMAC key, generation, retry loop, normalized identity, HTTP, cookie, authorization, or selected-Business behavior.
+
+Validation evidence:
+
+- Seventeen focused Cycle 031 tests pass. They cover schema compatibility and constraints, full transaction commit, unusable/missing User rejection, uniform challenge rejection, absent prior/rate no-ops, both named digest collisions, unrelated uniqueness failure, late-stage rollback, one-winner challenge concurrency, both forced issuance-clear/rate-record orders, lifecycle validation, and rollback-failure signaling.
+- All five real-PostgreSQL 18.4 persistence files pass 60 tests after migration 7. Existing session resolution, password verification, pre-session challenge, and rate-limit behavior remains covered.
+- Definitive aggregate validation, architecture/security audits, and generated-state cleanup are recorded by the Cycle completion report.
+
+Ralph evidence:
+
+- Three meaningful iterations were used. Iteration 1 implemented the authorized migration/adapter and reached 15 focused passing tests. Evidence review found required prior/rate no-op and both forced issuance-clear/rate-record orderings were not yet direct; iteration 2 added that coverage and reached 17 focused and 60 aggregate persistence tests without changing accepted runtime semantics. Final schema review found direct authenticated-CSRF digest-length and audit UUID/FK/fixed-code assertions missing; iteration 3 added those checks within the existing 17-test suite without changing runtime semantics.
+
+Deferred and not applicable:
+
+- The server-owned three-attempt collision coordinator, complete sign-in orchestration, ID00/ID04 Fastify routes, cookie writing, unsafe-operation authenticated-CSRF enforcement, authorization/Membership, product API/UI, mobile, provider, telemetry, deployment, cleanup scheduling, and merchant testing remain deliberately deferred.
+
+Recommended next cycle:
+
+Cycle 032 — Sign-In Orchestration Foundation.
+
+Recommended next task:
+
+Task 001 — Implement Rate-Limited Credential Verification and Three-Attempt Atomic Session Issuance Coordination.
+
+Objective:
+
+Compose the executable normalization, password-verification, rate-limit, pre-session challenge, evidence-generation, and atomic-issuance boundaries into one server-owned sign-in operation with the accepted expected-outcome mapping and at most three complete evidence attempts, without HTTP or cookie writing.
+
+Why next:
+
+Every persistence and cryptographic prerequisite is now executable. The server-owned coordinator is the smallest remaining boundary that can classify proof outcomes, preserve rate semantics, consume one challenge only through issuance, regenerate both evidence values on the two authorized collision identities, and expose one operation result to the later Fastify route.
+
+Explicit non-goals:
+
+- No ID00/ID04 Fastify route, cookie writing, protected-operation CSRF middleware, authorization/Membership, product API/UI, mobile, provider, telemetry, deployment, or merchant user testing.

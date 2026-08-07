@@ -143,6 +143,7 @@ describe('session migration foundation', () => {
       ['sem_caderno'],
     );
     expect(tables.rows.map((row) => row.tableName)).toEqual([
+      'audit_events',
       'businesses',
       'pre_session_challenges',
       'schema_migration_checksums',
@@ -159,7 +160,7 @@ describe('session migration foundation', () => {
          INNER JOIN sem_caderno.schema_migration_checksums AS checksum USING (name)
         ORDER BY history.id`,
     );
-    expect(applied.rows).toHaveLength(6);
+    expect(applied.rows).toHaveLength(7);
     expect(applied.rows.every((row) => /^[a-f0-9]{64}$/.test(row.checksum))).toBe(true);
 
     const userId = await insertUser();
@@ -190,6 +191,8 @@ describe('session migration foundation', () => {
       'revoked_at',
       'updated_at',
       'version',
+      'authenticated_csrf_digest_version',
+      'authenticated_csrf_digest',
     ]);
   });
 

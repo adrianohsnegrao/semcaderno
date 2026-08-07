@@ -339,6 +339,8 @@ Cycle 029 requires no new application contract. The server generator reuses the 
 
 Cycle 030 closes the issuance result and transaction input. `IssueSessionInput` additionally requires the already-derived purpose-branded `SignInRateLimitAccountKey`, allowing one atomic clear without passing or re-deriving normalized identity. `SessionIssuanceResult` is a closed union: `issued` with safe User/expiry, `userRejected`, `preSessionChallengeRejected`, or `digestCollision`. Unknown, expired, and consumed challenges deliberately share one expected outcome; locked User lifecycle regression shares one generic expected outcome; only new session or authenticated-CSRF digest uniqueness conflicts produce the retry signal. Connection, query, decoding, rollback, timestamp, and every other infrastructure failure reject the promise. No result includes a count, PostgreSQL code, constraint name, session identifier, digest, bearer, HMAC key, or authorization fact.
 
+Cycle 031 fulfills this unchanged application-owned port in PostgreSQL infrastructure. The adapter validates only canonical versioned digests and explicit lifecycle instants, returns the closed expected outcomes after committed transaction or successful rollback, and keeps PostgreSQL codes, constraint names, rows, locks, and transaction state behind the port. It adds no coordinator, CSPRNG, raw evidence, HTTP, cookie, or authorization contract.
+
 Refresh or revalidate session:
 
 - Purpose: determine whether session remains valid and whether active Business context still authorizes use.

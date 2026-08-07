@@ -520,12 +520,18 @@ Cycle 029 adds one server-owned generator that performs separate Node `crypto.ra
 
 An optional direct byte source makes exact framing and independence deterministic in tests without introducing a generic random-service abstraction. Invalid source output, CSPRNG failure, and derivation failure reject with no raw evidence or secret detail. There is no persistence, migration, collision retry, sign-in transaction, route, cookie, selected-Business, authorization, or product behavior.
 
-## 25. Recommended Next Cycle
+## 25. Cycle 031 Issuance Persistence Implementation Profile
 
-**Cycle 030 - Session Issuance Persistence Foundation**
+Cycle 031 adds the ordered `20260806000400-add-session-issuance-foundation` migration and fulfills `SessionIssuanceTransactionPort` with `PostgresSessionIssuanceAdapter`. The additive schema leaves historical authenticated-CSRF pairs null, requires complete version-1 32-byte pairs for new issuance, creates only the partial uniqueness index and minimal success-audit table, and fabricates no historical evidence.
 
-**Task 001 - Implement Atomic Digest-Only Session Issuance and Authenticated-CSRF Binding**
+One transaction uses the accepted rate-key advisory lock and exact operation order. Real PostgreSQL evidence proves committed success, expected rejection rollback, both named digest collisions, unrelated and late infrastructure failure rollback, absent-row no-ops, one challenge winner, and both rate-record/issuance-clear linearization orders. The adapter owns no raw evidence, key, CSPRNG, retry loop, coordinator, HTTP, or cookie behavior.
 
-Objective: fulfill the existing `SessionIssuanceTransactionPort` with the minimum PostgreSQL schema and one atomic transaction that revalidates the User, consumes pre-session evidence, revokes only the prior presented session when supplied, inserts the fresh digest-only session/authenticated-CSRF binding, and clears rate state.
+## 26. Recommended Next Cycle
 
-Explicit non-goals: no complete sign-in coordinator, collision-retry orchestration, ID00/ID04 Fastify route, cookie writing, final protected-operation CSRF enforcement, authorization, product UI, provider, deployment, or merchant testing.
+**Cycle 032 - Sign-In Orchestration Foundation**
+
+**Task 001 - Implement Rate-Limited Credential Verification and Three-Attempt Atomic Session Issuance Coordination**
+
+Objective: compose the executable normalization, password verification, rate-limit, pre-session challenge, evidence generation, and atomic issuance boundaries into one server-owned sign-in operation with the accepted expected-outcome mapping and at most three complete evidence attempts, without HTTP or cookie writing.
+
+Explicit non-goals: no ID00/ID04 Fastify route, cookie writing, protected-operation CSRF middleware, authorization, product UI, provider, deployment, or merchant testing.
