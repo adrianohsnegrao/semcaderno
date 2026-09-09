@@ -42,6 +42,7 @@ sob controle humano.
 - bloqueio de pagamento maior que a dívida;
 - registro de despesas;
 - preparação de lembrete por WhatsApp com chave Pix opcional;
+- configuração protegida e por estabelecimento para futura integração oficial do WhatsApp Cloud API;
 - separação explícita entre “lembrete enviado” e “pagamento recebido”;
 - atividade financeira auditável e cancelamento sem apagar o passado;
 - tutorial de primeiro acesso;
@@ -112,15 +113,20 @@ pnpm --filter @sem-caderno/web start
 
 Variáveis principais:
 
-| Variável                     | Finalidade                                                   |
-| ---------------------------- | ------------------------------------------------------------ |
-| `DATABASE_URL`               | conexão PostgreSQL; obrigatória quando `NODE_ENV=production` |
-| `SEM_CADERNO_WEB_ORIGIN`     | origem exata autorizada pela API                             |
-| `SEM_CADERNO_SECURE_COOKIES` | mantenha `true` em HTTPS; o Compose local usa `false`        |
-| `SEM_CADERNO_DATABASE_SSL`   | use `require` quando o provedor exigir TLS no PostgreSQL     |
-| `NEXT_PUBLIC_API_URL`        | endereço público da API usado pelo navegador                 |
+| Variável                              | Finalidade                                                   |
+| ------------------------------------- | ------------------------------------------------------------ |
+| `DATABASE_URL`                        | conexão PostgreSQL; obrigatória quando `NODE_ENV=production` |
+| `SEM_CADERNO_WEB_ORIGIN`              | origem exata autorizada pela API                             |
+| `SEM_CADERNO_SECURE_COOKIES`          | mantenha `true` em HTTPS; o Compose local usa `false`        |
+| `SEM_CADERNO_DATABASE_SSL`            | use `require` quando o provedor exigir TLS no PostgreSQL     |
+| `NEXT_PUBLIC_API_URL`                 | endereço público da API usado pelo navegador                 |
+| `SEM_CADERNO_WHATSAPP_ENCRYPTION_KEY` | chave base64url de 32 bytes para proteger tokens da Meta     |
 
 Segredos e arquivos `.env` não são versionados.
+
+Para habilitar o cadastro seguro do token do WhatsApp, gere uma chave exclusiva de 32 bytes em
+base64url e informe `SEM_CADERNO_WHATSAPP_ENCRYPTION_KEY`. Sem essa chave, a aplicação continua
+funcionando com o fluxo manual, mas recusa salvar um token oficial.
 
 ## Fluxo principal
 

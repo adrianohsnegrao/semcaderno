@@ -229,6 +229,9 @@ export function SemCadernoApp() {
           <Settings
             data={snapshot}
             save={(body) => mutate('/api/mvp/settings', body, 'Configurações salvas.', 'PUT')}
+            saveWhatsApp={(body) =>
+              mutate('/api/mvp/settings/whatsapp', body, 'Configuração do WhatsApp salva.', 'PUT')
+            }
             signOut={async () => {
               await request('/api/mvp/sign-out', { method: 'POST' }, session.csrfToken);
               setSession(undefined);

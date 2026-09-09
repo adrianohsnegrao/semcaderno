@@ -54,7 +54,20 @@ export type Activity = {
   createdAt: string;
 };
 export type Snapshot = {
-  business: { id: string; name: string; pixKey?: string; demo: boolean };
+  business: {
+    id: string;
+    name: string;
+    pixKey?: string;
+    demo: boolean;
+    whatsapp: {
+      status: 'not_configured' | 'incomplete' | 'ready' | 'disabled';
+      wabaId?: string;
+      phoneNumberId?: string;
+      templateName?: string;
+      tokenConfigured: boolean;
+      enabled: boolean;
+    };
+  };
   user: { id: string; name: string; email: string };
   customers: Customer[];
   products: Product[];

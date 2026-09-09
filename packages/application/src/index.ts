@@ -60,4 +60,5 @@ export {
   type Sale,
   type SaleDraft,
   type SaleItem,
+  type WhatsAppIntegration,
 } from './mvp-model.js';

@@ -20,10 +20,17 @@ import {
   type PublicSession,
   type Sale,
   type SaleDraft,
+  type WhatsAppIntegration,
 } from '@sem-caderno/application';
 
 type MutableSnapshot = {
-  business: { id: string; name: string; pixKey?: string; demo: boolean };
+  business: {
+    id: string;
+    name: string;
+    pixKey?: string;
+    demo: boolean;
+    whatsapp: WhatsAppIntegration;
+  };
   user: { id: string; name: string; email: string };
   customers: Customer[];
   products: Product[];
@@ -96,6 +103,31 @@ const assertStock = (value: number) => {
   if (!Number.isSafeInteger(value) || value < 0 || value > 9_999_999)
     throw new MvpValidationError('Informe uma quantidade de estoque válida.');
   return value;
+};
+const whatsappState = (input: {
+  wabaId?: string;
+  phoneNumberId?: string;
+  accessToken?: string;
+  templateName?: string;
+  enabled?: boolean;
+}): WhatsAppIntegration => {
+  const configured = Boolean(
+    input.wabaId && input.phoneNumberId && input.accessToken && input.templateName,
+  );
+  return {
+    status: input.enabled
+      ? configured
+        ? 'ready'
+        : 'incomplete'
+      : configured
+        ? 'disabled'
+        : 'not_configured',
+    ...(input.wabaId ? { wabaId: input.wabaId } : {}),
+    ...(input.phoneNumberId ? { phoneNumberId: input.phoneNumberId } : {}),
+    ...(input.templateName ? { templateName: input.templateName } : {}),
+    tokenConfigured: Boolean(input.accessToken),
+    enabled: Boolean(input.enabled && configured),
+  };
 };
 
 const makeSession = (snapshot: MutableSnapshot): PublicSession => ({
@@ -221,6 +253,7 @@ const seedSnapshot = (): MutableSnapshot => {
       name: 'Mercearia Boa Vizinhança',
       pixKey: 'contato@boavizinhanca.com.br',
       demo: true,
+      whatsapp: whatsappState({}),
     },
     user: { id: userId, name: 'Marina Oliveira', email: 'demo@semcaderno.app' },
     customers,
@@ -288,6 +321,7 @@ export class MemoryMvpStore implements MvpStore {
         id: randomUUID(),
         name: assertText(input.businessName, 'Nome do estabelecimento'),
         demo: false,
+        whatsapp: whatsappState({}),
       },
       user: { id: randomUUID(), name: assertText(input.name, 'Seu nome'), email },
       customers: [],
@@ -604,6 +638,31 @@ export class MemoryMvpStore implements MvpStore {
     snapshot.business.name = assertText(input.businessName, 'Nome do estabelecimento');
     if (input.pixKey?.trim()) snapshot.business.pixKey = assertText(input.pixKey, 'Chave Pix', 160);
     else delete snapshot.business.pixKey;
+  }
+
+  async updateWhatsAppIntegration(
+    session: PublicSession,
+    input: Readonly<{
+      wabaId: string;
+      phoneNumberId: string;
+      accessToken?: string;
+      templateName: string;
+      enabled: boolean;
+    }>,
+  ): Promise<WhatsAppIntegration> {
+    const snapshot = this.requireAccount(session).snapshot;
+    const previous = snapshot.business.whatsapp;
+    const config = whatsappState({
+      wabaId: assertText(input.wabaId, 'ID da conta WhatsApp Business', 80),
+      phoneNumberId: assertText(input.phoneNumberId, 'ID do número de telefone', 80),
+      ...(input.accessToken?.trim() || previous.tokenConfigured
+        ? { accessToken: input.accessToken?.trim() || 'configured' }
+        : {}),
+      templateName: assertText(input.templateName, 'Nome do template', 120),
+      enabled: input.enabled,
+    });
+    snapshot.business.whatsapp = config;
+    return config;
   }
 
   async cancelSale(

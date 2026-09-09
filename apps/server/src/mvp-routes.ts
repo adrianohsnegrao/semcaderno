@@ -371,6 +371,25 @@ export const registerMvpRoutes = (
       return handleError(error, reply);
     }
   });
+  app.put('/api/mvp/settings/whatsapp', async (request, reply) => {
+    const session = await authorizeMutation(request, reply);
+    if (!session) return;
+    try {
+      const body = objectBody(request);
+      const accessToken = optionalText(body, 'accessToken');
+      return {
+        data: await store.updateWhatsAppIntegration(session, {
+          wabaId: text(body, 'wabaId'),
+          phoneNumberId: text(body, 'phoneNumberId'),
+          ...(accessToken ? { accessToken } : {}),
+          templateName: text(body, 'templateName'),
+          enabled: body['enabled'] === true,
+        }),
+      };
+    } catch (error) {
+      return handleError(error, reply);
+    }
+  });
   app.post('/api/mvp/sales/:saleId/cancel', async (request, reply) => {
     const session = await authorizeMutation(request, reply);
     if (!session) return;

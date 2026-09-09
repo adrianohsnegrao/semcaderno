@@ -25,6 +25,8 @@ The release must let one owner:
 9. answer how much entered, left, and remained in plain Brazilian Portuguese;
 10. inspect a concise activity history for financial confidence;
 11. see the available quantity of each product and prevent a sale from exceeding stock.
+12. configure official WhatsApp Cloud API credentials per establishment without exposing the token
+    back to the browser; message delivery remains manual until provider onboarding is complete.
 
 ## Implementation decisions
 
@@ -48,6 +50,8 @@ The release must let one owner:
   transaction.
 - Confirming a sale decrements stock. Cancelling that sale restores its item quantities in the
   same transaction; editing historical sale-item snapshots remains forbidden.
+- WhatsApp configuration stores WABA/phone/template metadata and an encrypted access token, exposes
+  only configuration status, and never marks a financial record as paid.
 - Product and customer edits preserve identity and creation time. Product stock changes are
   recorded in the activity history.
 

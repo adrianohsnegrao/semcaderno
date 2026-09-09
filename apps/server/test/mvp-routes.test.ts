@@ -168,6 +168,45 @@ describe('MVP HTTP routes', () => {
     });
   });
 
+  it('accepts WhatsApp Cloud configuration without exposing the access token', async () => {
+    const authentication = await authenticate();
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/mvp/settings/whatsapp',
+      headers: {
+        cookie: authentication.cookies,
+        'x-sem-caderno-csrf': authentication.csrf,
+        'idempotency-key': 'whatsapp_http_001',
+      },
+      payload: {
+        wabaId: 'waba-demo-123',
+        phoneNumberId: 'phone-demo-456',
+        accessToken: 'secret-token-never-returned',
+        templateName: 'cobranca_sem_caderno',
+        enabled: true,
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      data: {
+        status: 'ready',
+        wabaId: 'waba-demo-123',
+        phoneNumberId: 'phone-demo-456',
+        templateName: 'cobranca_sem_caderno',
+        tokenConfigured: true,
+        enabled: true,
+      },
+    });
+    expect(JSON.stringify(response.json())).not.toContain('secret-token');
+    const snapshot = await app.inject({
+      url: '/api/mvp/snapshot',
+      headers: { cookie: authentication.cookies },
+    });
+    expect(snapshot.json()).toMatchObject({
+      data: { business: { whatsapp: { status: 'ready', tokenConfigured: true } } },
+    });
+  });
+
   it('requires CSRF evidence to sign out and revokes the authenticated session', async () => {
     const authentication = await authenticate();
     const withoutCsrf = await app.inject({

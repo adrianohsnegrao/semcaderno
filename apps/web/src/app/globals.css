@@ -855,6 +855,40 @@ label small {
   grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
   gap: 20px;
 }
+.whatsapp-settings {
+  grid-column: 1 / -1;
+}
+.integration-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.integration-heading h2 {
+  margin: 5px 0 0;
+}
+.integration-status {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #edf1eb;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.integration-status.ready {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.integration-status.incomplete {
+  background: #fff0e7;
+  color: var(--orange);
+}
+.integration-note {
+  display: block;
+  margin-top: 14px;
+  color: var(--muted);
+  line-height: 1.5;
+}
 .simple-form {
   display: grid;
   gap: 15px;

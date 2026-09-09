@@ -60,7 +60,13 @@ export type Activity = Readonly<{
   createdAt: string;
 }>;
 export type BusinessSnapshot = Readonly<{
-  business: Readonly<{ id: string; name: string; pixKey?: string; demo: boolean }>;
+  business: Readonly<{
+    id: string;
+    name: string;
+    pixKey?: string;
+    demo: boolean;
+    whatsapp: WhatsAppIntegration;
+  }>;
   user: Readonly<{ id: string; name: string; email: string }>;
   customers: readonly Customer[];
   products: readonly Product[];
@@ -68,6 +74,14 @@ export type BusinessSnapshot = Readonly<{
   payments: readonly Payment[];
   expenses: readonly Expense[];
   activities: readonly Activity[];
+}>;
+export type WhatsAppIntegration = Readonly<{
+  status: 'not_configured' | 'incomplete' | 'ready' | 'disabled';
+  wabaId?: string;
+  phoneNumberId?: string;
+  templateName?: string;
+  tokenConfigured: boolean;
+  enabled: boolean;
 }>;
 export type PublicSession = Readonly<{
   token: string;
@@ -134,6 +148,16 @@ export type MvpStore = Readonly<{
     session: PublicSession,
     input: Readonly<{ businessName: string; pixKey?: string }>,
   ): Promise<void>;
+  updateWhatsAppIntegration(
+    session: PublicSession,
+    input: Readonly<{
+      wabaId: string;
+      phoneNumberId: string;
+      accessToken?: string;
+      templateName: string;
+      enabled: boolean;
+    }>,
+  ): Promise<WhatsAppIntegration>;
   cancelSale(
     session: PublicSession,
     input: Readonly<{ saleId: string; reason: string }>,

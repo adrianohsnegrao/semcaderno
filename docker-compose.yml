@@ -23,6 +23,7 @@ services:
       PORT: 3001
       SEM_CADERNO_WEB_ORIGIN: http://localhost:3000
       SEM_CADERNO_SECURE_COOKIES: 'false'
+      SEM_CADERNO_WHATSAPP_ENCRYPTION_KEY: ${SEM_CADERNO_WHATSAPP_ENCRYPTION_KEY:-}
     depends_on:
       database:
         condition: service_healthy

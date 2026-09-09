@@ -96,8 +96,8 @@ describe('pre-session challenge migration', () => {
          INNER JOIN sem_caderno.schema_migration_checksums AS checksum USING (name)
         ORDER BY history.id`,
     );
-    expect(applied.rows).toHaveLength(9);
-    expect(applied.rows.at(-1)?.name).toBe('20260910000100-add-catalog-stock-and-unique-contacts');
+    expect(applied.rows).toHaveLength(10);
+    expect(applied.rows.at(-1)?.name).toBe('20260910000200-add-whatsapp-cloud-configuration');
     expect(applied.rows.every((row) => /^[a-f0-9]{64}$/.test(row.checksum))).toBe(true);
   });
 

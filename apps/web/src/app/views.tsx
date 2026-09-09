@@ -892,10 +892,12 @@ export function ActivityList({
 export function Settings({
   data,
   save,
+  saveWhatsApp,
   signOut,
 }: {
   data: Snapshot;
   save: (body: unknown) => Promise<unknown>;
+  saveWhatsApp: (body: unknown) => Promise<unknown>;
   signOut: () => Promise<void>;
 }) {
   return (
@@ -923,6 +925,48 @@ export function Settings({
         <button className="secondary danger" onClick={() => void signOut()}>
           Sair deste aparelho
         </button>
+      </section>
+      <section className="card form-card whatsapp-settings">
+        <div className="integration-heading">
+          <div>
+            <span className="eyebrow">WHATSAPP BUSINESS</span>
+            <h2>Preparar envio oficial</h2>
+          </div>
+          <span className={`integration-status ${data.business.whatsapp.status}`}>
+            {data.business.whatsapp.status === 'ready'
+              ? 'Pronto'
+              : data.business.whatsapp.status === 'disabled'
+                ? 'Desativado'
+                : data.business.whatsapp.status === 'incomplete'
+                  ? 'Incompleto'
+                  : 'Não configurado'}
+          </span>
+        </div>
+        <p>
+          Informe os dados da Meta para deixar a integração preparada. Nenhuma mensagem automática
+          será enviada até que você ative a configuração.
+        </p>
+        <SimpleForm
+          fields={[
+            ['wabaId', 'ID da conta WhatsApp Business', 'text'],
+            ['phoneNumberId', 'ID do número de telefone', 'text'],
+            ['accessToken', 'Token de acesso (deixe vazio para manter o atual)', 'password'],
+            ['templateName', 'Nome do template aprovado', 'text'],
+          ]}
+          defaults={{
+            wabaId: data.business.whatsapp.wabaId ?? '',
+            phoneNumberId: data.business.whatsapp.phoneNumberId ?? '',
+            templateName: data.business.whatsapp.templateName ?? '',
+          }}
+          submit={async (body) => {
+            await saveWhatsApp({ ...body, enabled: data.business.whatsapp.enabled });
+          }}
+          button="Salvar configuração"
+        />
+        <small className="integration-note">
+          O token nunca é exibido novamente. No PostgreSQL ele é protegido no servidor; o fluxo
+          manual por WhatsApp continua disponível enquanto a integração não estiver ativa.
+        </small>
       </section>
     </div>
   );

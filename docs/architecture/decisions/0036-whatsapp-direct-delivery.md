@@ -42,3 +42,8 @@ be idempotent, store only provider identifiers and delivery states, and never ma
 - The user explicitly reviews every message before WhatsApp receives personal and financial data.
 - Direct sending is technically feasible and has a documented production path, but cannot be
   truthfully demonstrated without external business credentials and policy setup.
+
+The application now exposes a per-business configuration boundary for the WABA ID, phone number ID,
+approved template name, activation flag and protected access token. Configuration status is returned
+without returning the token. The current manual handoff remains the only delivery path until the
+official provider adapter, consent flow and webhook reconciliation are implemented.

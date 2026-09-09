@@ -27,6 +27,7 @@ reading, and financial history that is never silently erased.
 - overpayment prevention;
 - expense recording;
 - user-reviewed WhatsApp reminder with an optional Pix key;
+- per-business protected configuration for a future official WhatsApp Cloud API adapter;
 - explicit separation between a collection reminder and a received payment;
 - auditable activity history and history-preserving cancellation;
 - first-use tutorial and realistic sample data;
@@ -68,6 +69,10 @@ your establishment. Data remains in the `sem-caderno-data` volume.
 
 See the [Portuguese README](README.md) for environment configuration, architecture, security,
 quality gates, domain decisions, and product limitations.
+
+The `SEM_CADERNO_WHATSAPP_ENCRYPTION_KEY` variable is a dedicated 32-byte base64url key used to
+protect a Meta access token at rest. Without it, the manual `wa.me` flow remains available but a
+Cloud API token cannot be saved.
 
 ## Architecture at a glance
 

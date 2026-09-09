@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createHash, randomBytes } from 'node:crypto';
 
 import { hash, verify } from 'argon2';
 import type { Pool, PoolClient } from 'pg';
@@ -22,6 +22,7 @@ import {
   type Sale,
   type SaleDraft,
   type SaleItem,
+  type WhatsAppIntegration,
 } from '@sem-caderno/application';
 
 type Row = Record<string, unknown>;
@@ -37,6 +38,12 @@ const optionalString = (row: Row, key: string): string | undefined => {
   const value = row[key];
   if (value === null || value === undefined) return undefined;
   if (typeof value !== 'string') throw new Error('PostgreSQL returned an invalid row.');
+  return value;
+};
+const optionalBuffer = (row: Row, key: string): Buffer | undefined => {
+  const value = row[key];
+  if (value === null || value === undefined) return undefined;
+  if (!Buffer.isBuffer(value)) throw new Error('PostgreSQL returned an invalid secret.');
   return value;
 };
 const integerValue = (row: Row, key: string): number => {
@@ -107,6 +114,42 @@ const assertStock = (value: number) => {
     throw new MvpValidationError('Informe uma quantidade de estoque válida.');
   return value;
 };
+const encryptionKey = (value?: string): Buffer => {
+  if (!value)
+    throw new MvpValidationError('Configure a chave de proteção do WhatsApp no servidor.');
+  const key = Buffer.from(value, 'base64url');
+  if (key.length !== 32)
+    throw new MvpValidationError('A chave de proteção do WhatsApp é inválida.');
+  return key;
+};
+const encryptToken = (token: string, key: Buffer): Buffer => {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), encrypted]);
+};
+const mapWhatsApp = (row: Row): WhatsAppIntegration => {
+  const wabaId = optionalString(row, 'wabaId');
+  const phoneNumberId = optionalString(row, 'phoneNumberId');
+  const templateName = optionalString(row, 'templateName');
+  const tokenConfigured = Boolean(optionalBuffer(row, 'tokenCiphertext'));
+  const configured = Boolean(wabaId && phoneNumberId && templateName && tokenConfigured);
+  const enabled = booleanValue(row, 'enabled');
+  return {
+    status: enabled
+      ? configured
+        ? 'ready'
+        : 'incomplete'
+      : configured
+        ? 'disabled'
+        : 'not_configured',
+    ...(wabaId ? { wabaId } : {}),
+    ...(phoneNumberId ? { phoneNumberId } : {}),
+    ...(templateName ? { templateName } : {}),
+    tokenConfigured,
+    enabled: Boolean(enabled && configured),
+  };
+};
 const issueEvidence = () => ({
   token: randomBytes(32).toString('base64url'),
   csrfToken: randomBytes(24).toString('base64url'),
@@ -162,7 +205,12 @@ const mapActivity = (row: Row): Activity => ({
 });
 
 export class PostgresMvpStore implements MvpStore {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly whatsappEncryptionKeyBase64Url = process.env[
+      'SEM_CADERNO_WHATSAPP_ENCRYPTION_KEY'
+    ],
+  ) {}
 
   async register(
     input: Readonly<{ name: string; email: string; password: string; businessName: string }>,
@@ -293,7 +341,7 @@ export class PostgresMvpStore implements MvpStore {
     const [business, customers, products, sales, items, payments, expenses, activities] =
       await Promise.all([
         this.pool.query<Row>(
-          `SELECT display_name AS name,pix_key AS "pixKey" FROM sem_caderno.businesses WHERE id=$1 AND state='active'`,
+          `SELECT display_name AS name,pix_key AS "pixKey",whatsapp_waba_id AS "wabaId",whatsapp_phone_number_id AS "phoneNumberId",whatsapp_access_token_ciphertext AS "tokenCiphertext",whatsapp_template_name AS "templateName",whatsapp_enabled AS enabled FROM sem_caderno.businesses WHERE id=$1 AND state='active'`,
           [session.businessId],
         ),
         this.pool.query<Row>(
@@ -374,6 +422,7 @@ export class PostgresMvpStore implements MvpStore {
           ? { pixKey: optionalString(businessRow, 'pixKey')! }
           : {}),
         demo: false,
+        whatsapp: mapWhatsApp(businessRow),
       },
       user: { id: session.userId, name: session.userName, email: session.email },
       customers: customers.rows.map(mapCustomer),
@@ -716,6 +765,53 @@ export class PostgresMvpStore implements MvpStore {
         session.businessId,
       ],
     );
+  }
+
+  async updateWhatsAppIntegration(
+    session: PublicSession,
+    input: Readonly<{
+      wabaId: string;
+      phoneNumberId: string;
+      accessToken?: string;
+      templateName: string;
+      enabled: boolean;
+    }>,
+  ): Promise<WhatsAppIntegration> {
+    const wabaId = assertText(input.wabaId, 'ID da conta WhatsApp Business', 80);
+    const phoneNumberId = assertText(input.phoneNumberId, 'ID do número de telefone', 80);
+    const templateName = assertText(input.templateName, 'Nome do template', 120);
+    const key = encryptionKey(this.whatsappEncryptionKeyBase64Url);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const existing = await client.query<Row>(
+        `SELECT whatsapp_access_token_ciphertext AS "tokenCiphertext" FROM sem_caderno.businesses WHERE id=$1 AND state='active' FOR UPDATE`,
+        [session.businessId],
+      );
+      if (!existing.rows[0]) throw new MvpNotFoundError('Estabelecimento não encontrado.');
+      const token = input.accessToken?.trim();
+      const ciphertext = token
+        ? encryptToken(token, key)
+        : optionalBuffer(existing.rows[0], 'tokenCiphertext');
+      const result = await client.query<Row>(
+        `UPDATE sem_caderno.businesses SET whatsapp_waba_id=$1,whatsapp_phone_number_id=$2,whatsapp_access_token_ciphertext=$3,whatsapp_template_name=$4,whatsapp_enabled=$5,updated_at=now(),version=version+1 WHERE id=$6 RETURNING whatsapp_waba_id AS "wabaId",whatsapp_phone_number_id AS "phoneNumberId",whatsapp_access_token_ciphertext AS "tokenCiphertext",whatsapp_template_name AS "templateName",whatsapp_enabled AS enabled`,
+        [
+          wabaId,
+          phoneNumberId,
+          ciphertext ?? null,
+          templateName,
+          input.enabled,
+          session.businessId,
+        ],
+      );
+      await client.query('COMMIT');
+      return mapWhatsApp(result.rows[0]!);
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async cancelSale(
