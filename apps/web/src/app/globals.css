@@ -894,6 +894,28 @@ label small {
   gap: 15px;
   margin-top: 20px;
 }
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 18px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--green);
+}
+.checkbox-row span {
+  display: grid;
+  gap: 4px;
+}
+.checkbox-row small {
+  color: var(--muted);
+  line-height: 1.45;
+}
 .account-card p {
   line-height: 1.7;
   color: var(--muted);

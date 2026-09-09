@@ -900,6 +900,8 @@ export function Settings({
   saveWhatsApp: (body: unknown) => Promise<unknown>;
   signOut: () => Promise<void>;
 }) {
+  const [whatsappEnabled, setWhatsAppEnabled] = useState(data.business.whatsapp.enabled);
+
   return (
     <div className="settings-grid">
       <section className="card form-card">
@@ -946,6 +948,17 @@ export function Settings({
           Informe os dados da Meta para deixar a integração preparada. Nenhuma mensagem automática
           será enviada até que você ative a configuração.
         </p>
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={whatsappEnabled}
+            onChange={(event) => setWhatsAppEnabled(event.target.checked)}
+          />
+          <span>
+            <b>Ativar integração quando os dados estiverem completos</b>
+            <small>O sistema continuará bloqueando o envio se faltar algum dado obrigatório.</small>
+          </span>
+        </label>
         <SimpleForm
           fields={[
             ['wabaId', 'ID da conta WhatsApp Business', 'text'],
@@ -959,7 +972,7 @@ export function Settings({
             templateName: data.business.whatsapp.templateName ?? '',
           }}
           submit={async (body) => {
-            await saveWhatsApp({ ...body, enabled: data.business.whatsapp.enabled });
+            await saveWhatsApp({ ...body, enabled: whatsappEnabled });
           }}
           button="Salvar configuração"
         />
