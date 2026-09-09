@@ -623,8 +623,12 @@ label small {
   display: grid;
   grid-template-columns: minmax(170px, 1fr) 70px 140px auto;
   gap: 10px;
-  align-items: end;
+  align-items: start;
   margin-bottom: 12px;
+}
+.sale-item > .remove {
+  align-self: end;
+  margin-bottom: 22px;
 }
 .autocomplete-field {
   position: relative;
@@ -993,6 +997,12 @@ label small {
   display: flex;
   gap: 9px;
   margin-bottom: 15px;
+}
+.modal .simple-form {
+  margin-top: 16px;
+}
+.modal .simple-form label {
+  min-width: 0;
 }
 .history {
   border-top: 1px solid var(--line);
@@ -1447,6 +1457,9 @@ label small {
   }
   .sale-item label:nth-of-type(3) {
     grid-column: 1;
+  }
+  .sale-item > .remove {
+    margin-bottom: 0;
   }
   .choice-grid {
     grid-template-columns: 1fr;
