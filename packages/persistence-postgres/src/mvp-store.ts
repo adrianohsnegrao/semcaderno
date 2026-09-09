@@ -671,7 +671,7 @@ export class PostgresMvpStore implements MvpStore {
     instant: Date,
   ) {
     await client.query(
-      `INSERT INTO sem_caderno.mvp_sessions (token_digest,csrf_digest,user_id,business_id,created_at,expires_at) VALUES ($1,$2,$3,$4,$5,$5 + interval '12 hours')`,
+      `INSERT INTO sem_caderno.mvp_sessions (token_digest,csrf_digest,user_id,business_id,created_at,expires_at) VALUES ($1,$2,$3,$4,$5::timestamptz,$5::timestamptz + interval '12 hours')`,
       [
         digest(evidence.token),
         Buffer.from(evidence.csrfToken, 'utf8'),

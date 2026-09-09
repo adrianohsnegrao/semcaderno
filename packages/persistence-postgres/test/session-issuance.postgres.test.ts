@@ -233,12 +233,12 @@ beforeEach(async () => {
      TRUNCATE sem_caderno.audit_events, sem_caderno.sessions,
               sem_caderno.pre_session_challenges, sem_caderno.sign_in_rate_limits,
               sem_caderno.user_password_credentials, sem_caderno.businesses,
-              sem_caderno.users;`,
+              sem_caderno.users CASCADE;`,
   );
 });
 
 describe('session issuance migration', () => {
-  it('adds the compatibility pair, minimal audit profile, and seventh checksum', async () => {
+  it('adds the compatibility pair, minimal audit profile, and migration checksum history', async () => {
     const columns = await currentPool().query<{ columnName: string; isNullable: string }>(
       `SELECT column_name AS "columnName", is_nullable AS "isNullable"
          FROM information_schema.columns

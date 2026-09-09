@@ -144,8 +144,18 @@ describe('session migration foundation', () => {
     );
     expect(tables.rows.map((row) => row.tableName)).toEqual([
       'audit_events',
+      'business_memberships',
       'businesses',
+      'customers',
+      'expenses',
+      'mvp_activities',
+      'mvp_idempotency_records',
+      'mvp_sessions',
+      'payments',
       'pre_session_challenges',
+      'products',
+      'sale_items',
+      'sales',
       'schema_migration_checksums',
       'schema_migrations',
       'sessions',
