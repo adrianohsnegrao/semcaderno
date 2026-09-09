@@ -1,0 +1,14 @@
+FROM node:24-bookworm-slim AS build
+WORKDIR /workspace
+RUN corepack enable
+COPY . .
+RUN pnpm install --frozen-lockfile
+RUN pnpm build:packages && pnpm build:database && pnpm build:server
+
+FROM node:24-bookworm-slim AS runtime
+WORKDIR /workspace
+ENV NODE_ENV=production
+RUN corepack enable
+COPY --from=build /workspace /workspace
+EXPOSE 3001
+CMD ["sh", "-c", "pnpm --filter @sem-caderno/database-migrations migrate && pnpm --filter @sem-caderno/server start"]

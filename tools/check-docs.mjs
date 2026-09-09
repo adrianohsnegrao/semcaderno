@@ -17,7 +17,7 @@ let tableCount = 0;
 const markdownFiles = collectMarkdown(root);
 
 for (const file of markdownFiles) {
-  const content = readFileSync(file, 'utf8');
+  const content = readFileSync(file, 'utf8').replaceAll('\r\n', '\n');
   if (!content.endsWith('\n')) errors.push(`${file}: missing final newline`);
   const lines = content.split('\n');
 

@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build": "tsc -b",
+    "migrate": "node dist/src/main-production.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "check": "node ../../tools/check-migrations.mjs",
     "migrate:test": "node dist/src/main.js"

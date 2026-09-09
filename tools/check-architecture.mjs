@@ -36,7 +36,14 @@ const allowedExternalDependencies = new Map([
   ['@sem-caderno/web', new Set(['next', 'react', 'react-dom', '@types/react', '@types/react-dom'])],
   [
     '@sem-caderno/server',
-    new Set(['@fastify/cookie', '@testcontainers/postgresql', '@types/pg', 'fastify', 'pg']),
+    new Set([
+      '@fastify/cookie',
+      '@fastify/cors',
+      '@testcontainers/postgresql',
+      '@types/pg',
+      'fastify',
+      'pg',
+    ]),
   ],
   ['@sem-caderno/domain', new Set()],
   ['@sem-caderno/application', new Set()],
@@ -228,8 +235,6 @@ const validateRepositoryShape = () => {
     /^apps\/mobile\//,
     /(?:^|\/)projection-worker(?:\/|$)/,
     /(?:^|\/)(?:provider|providers|integrations)(?:\/|$)/,
-    /^\.github\/workflows\//,
-    /(?:^|\/)(?:Dockerfile|compose[^/]*\.ya?ml)$/i,
     /\.sql$/i,
   ];
   for (const file of allFiles) {

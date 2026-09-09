@@ -1,0 +1,15 @@
+.git
+.github
+.next
+**/.next
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+test-results
+playwright-report
+.env
+.data
+postgres-data
+*.log

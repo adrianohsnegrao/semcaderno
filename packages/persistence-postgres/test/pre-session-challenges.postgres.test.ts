@@ -96,8 +96,8 @@ describe('pre-session challenge migration', () => {
          INNER JOIN sem_caderno.schema_migration_checksums AS checksum USING (name)
         ORDER BY history.id`,
     );
-    expect(applied.rows).toHaveLength(7);
-    expect(applied.rows.at(-1)?.name).toBe('20260806000400-add-session-issuance-foundation');
+    expect(applied.rows).toHaveLength(8);
+    expect(applied.rows.at(-1)?.name).toBe('20260909000100-create-mvp-product-model');
     expect(applied.rows.every((row) => /^[a-f0-9]{64}$/.test(row.checksum))).toBe(true);
   });
 

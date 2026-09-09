@@ -12,3 +12,5 @@ export {
   type SessionEvidenceByteSource,
   type SessionEvidenceGenerator,
 } from './session-evidence-generation.js';
+export { MemoryMvpStore } from './memory-mvp-store.js';
+export type { BusinessSnapshot, MvpStore, PublicSession } from '@sem-caderno/application';

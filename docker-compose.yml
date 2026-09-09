@@ -1,0 +1,56 @@
+services:
+  database:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sem_caderno}
+      POSTGRES_USER: ${POSTGRES_USER:-sem_caderno}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sem-caderno-local}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - sem-caderno-data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sem_caderno}:${POSTGRES_PASSWORD:-sem-caderno-local}@database:5432/${POSTGRES_DB:-sem_caderno}
+      HOST: 0.0.0.0
+      PORT: 3001
+      SEM_CADERNO_WEB_ORIGIN: http://localhost:3000
+      SEM_CADERNO_SECURE_COOKIES: 'false'
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - '3001:3001'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+
+volumes:
+  sem-caderno-data:

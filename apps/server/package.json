@@ -11,18 +11,21 @@
   },
   "scripts": {
     "build": "tsc -b",
+    "dev": "pnpm run build && node dist/start.js",
+    "start": "node dist/start.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p test/tsconfig.json"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.2",
+    "@fastify/cors": "11.2.0",
     "@sem-caderno/application": "workspace:*",
     "@sem-caderno/contracts": "workspace:*",
     "@sem-caderno/persistence-postgres": "workspace:*",
-    "fastify": "5.11.2"
+    "fastify": "5.11.2",
+    "pg": "8.22.0"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "12.1.0",
-    "@types/pg": "8.20.3",
-    "pg": "8.22.0"
+    "@types/pg": "8.20.3"
   }
 }

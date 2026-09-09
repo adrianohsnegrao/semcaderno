@@ -36,3 +36,27 @@ export {
   type SessionResolutionPort,
   type SessionInspection,
 } from './session-inspection.js';
+export {
+  FinancialRuleError,
+  applyPayment,
+  previewSale,
+  simpleCashResult,
+  type SaleFinancialPreview,
+} from '@sem-caderno/domain';
+export {
+  MvpConflictError,
+  MvpNotFoundError,
+  MvpValidationError,
+  type Activity,
+  type BusinessSnapshot,
+  type Customer,
+  type Expense,
+  type FinancialStatus,
+  type MvpStore,
+  type Payment,
+  type Product,
+  type PublicSession,
+  type Sale,
+  type SaleDraft,
+  type SaleItem,
+} from './mvp-model.js';

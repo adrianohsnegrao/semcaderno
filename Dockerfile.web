@@ -1,0 +1,16 @@
+FROM node:24-bookworm-slim AS build
+WORKDIR /workspace
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+RUN corepack enable
+COPY . .
+RUN pnpm install --frozen-lockfile
+RUN pnpm build:contracts && pnpm build:web
+
+FROM node:24-bookworm-slim AS runtime
+WORKDIR /workspace
+ENV NODE_ENV=production
+RUN corepack enable
+COPY --from=build /workspace /workspace
+EXPOSE 3000
+CMD ["pnpm", "--filter", "@sem-caderno/web", "start"]
