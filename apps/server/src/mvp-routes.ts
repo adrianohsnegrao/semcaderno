@@ -220,6 +220,30 @@ export const registerMvpRoutes = (
       return handleError(error, reply);
     }
   });
+  app.put('/api/mvp/customers/:customerId', async (request, reply) => {
+    const session = await authorizeMutation(request, reply);
+    if (!session) return;
+    try {
+      const body = objectBody(request);
+      const params = request.params as { customerId?: string };
+      const phone = optionalText(body, 'phone');
+      const note = optionalText(body, 'note');
+      return {
+        data: await store.updateCustomer(
+          session,
+          params.customerId ?? '',
+          {
+            name: text(body, 'name'),
+            ...(phone ? { phone } : {}),
+            ...(note ? { note } : {}),
+          },
+          key(request),
+        ),
+      };
+    } catch (error) {
+      return handleError(error, reply);
+    }
+  });
   app.post('/api/mvp/products', async (request, reply) => {
     const session = await authorizeMutation(request, reply);
     if (!session) return;
@@ -228,10 +252,36 @@ export const registerMvpRoutes = (
       return reply.code(201).send({
         data: await store.createProduct(
           session,
-          { name: text(body, 'name'), priceCents: integer(body, 'priceCents') },
+          {
+            name: text(body, 'name'),
+            priceCents: integer(body, 'priceCents'),
+            stockQuantity: integer(body, 'stockQuantity'),
+          },
           key(request),
         ),
       });
+    } catch (error) {
+      return handleError(error, reply);
+    }
+  });
+  app.put('/api/mvp/products/:productId', async (request, reply) => {
+    const session = await authorizeMutation(request, reply);
+    if (!session) return;
+    try {
+      const body = objectBody(request);
+      const params = request.params as { productId?: string };
+      return {
+        data: await store.updateProduct(
+          session,
+          params.productId ?? '',
+          {
+            name: text(body, 'name'),
+            priceCents: integer(body, 'priceCents'),
+            stockQuantity: integer(body, 'stockQuantity'),
+          },
+          key(request),
+        ),
+      };
     } catch (error) {
       return handleError(error, reply);
     }
@@ -247,12 +297,9 @@ export const registerMvpRoutes = (
         if (!item || typeof item !== 'object' || Array.isArray(item))
           throw new MvpValidationError('Revise os itens da venda.');
         const value = item as UnknownRecord;
-        const productId = optionalText(value, 'productId');
         return {
-          ...(productId ? { productId } : {}),
-          description: text(value, 'description'),
+          productId: text(value, 'productId'),
           quantity: integer(value, 'quantity'),
-          unitPriceCents: integer(value, 'unitPriceCents'),
         };
       });
       const method = text(body, 'paymentMethod') as Payment['method'];

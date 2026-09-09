@@ -6,7 +6,8 @@ export class FinancialRuleError extends Error {
       | 'INVALID_QUANTITY'
       | 'PAYMENT_EXCEEDS_TOTAL'
       | 'CUSTOMER_REQUIRED'
-      | 'OVERPAYMENT',
+      | 'OVERPAYMENT'
+      | 'INSUFFICIENT_STOCK',
   ) {
     super(code);
   }
@@ -73,3 +74,14 @@ export const applyPayment = (
 
 export const simpleCashResult = (receivedCents: number, expenseCents: number): number =>
   assertNonNegativeCents(receivedCents) - assertNonNegativeCents(expenseCents);
+
+export const assertStockAvailable = (available: number, requested: number): void => {
+  if (
+    !Number.isSafeInteger(available) ||
+    available < 0 ||
+    !Number.isSafeInteger(requested) ||
+    requested <= 0
+  )
+    throw new FinancialRuleError('INVALID_QUANTITY');
+  if (requested > available) throw new FinancialRuleError('INSUFFICIENT_STOCK');
+};

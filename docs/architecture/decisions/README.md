@@ -71,6 +71,7 @@ Specification, implementation, validation, or future decision work created by th
 - [ADR 0033: Use Zod as the Executable Transport Source and Derive Types and OpenAPI](0033-zod-contract-source-types-openapi-derived.md)
 - [ADR 0034: Use Explicit Session Evidence with Keyed Digest Resolution](0034-explicit-session-evidence-keyed-digest-resolution.md)
 - [ADR 0035: Use Local Email-Password Verification with Split Session and CSRF Issuance](0035-local-email-password-session-csrf-issuance.md)
+- [ADR 0036: Keep WhatsApp Delivery Manual Until Official Cloud API Onboarding](0036-whatsapp-direct-delivery.md)
 
 ## Open Decisions
 

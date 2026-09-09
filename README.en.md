@@ -16,9 +16,13 @@ reading, and financial history that is never silently erased.
 - account and establishment onboarding;
 - secure sign-in and sign-out;
 - practical dashboard for money received, expenses, simple remainder, and outstanding debt;
-- customers and optional product catalog;
+- customer and product creation and editing;
+- per-business duplicate protection for normalized product names and WhatsApp numbers;
+- automatic BRL currency masks and simple stock quantities;
+- transactional stock decrement on sale and restoration on cancellation;
 - fully paid, partially paid, and unpaid sales;
-- ad hoc items, so a catalog is not required for the first sale;
+- searchable product suggestions that only accept active, registered, in-stock products;
+- server-authoritative catalog descriptions and prices;
 - customer purchase history and later partial/full payments;
 - overpayment prevention;
 - expense recording;
@@ -82,6 +86,10 @@ Production fails closed when `DATABASE_URL` is missing. Money uses integer BRL c
 comes from the authenticated session, state-changing requests are idempotent, related PostgreSQL
 writes are transactional, and financial corrections preserve history.
 
+Sales lock the selected catalog rows, verify aggregated stock, resolve current prices on the server,
+and decrement inventory in the same transaction. Database constraints reinforce product-name and
+WhatsApp uniqueness. Cancelling a sale preserves its history and restores its catalog quantities.
+
 ## Applied AI portfolio connection
 
 Sem Caderno deliberately has no decorative chatbot or unnecessary model call. It reuses the
@@ -100,6 +108,11 @@ The gate covers runtime, documentation, formatting, lint, strict TypeScript, arc
 contracts, application behavior, HTTP/session security, MVP business rules, PostgreSQL integration,
 all builds, and migration order/checksums. Persistence tests create isolated PostgreSQL instances
 in disposable containers during CI.
+
+Direct WhatsApp sending is intentionally deferred. The MVP opens a user-reviewed `wa.me` message;
+the documented production path uses Meta's official Cloud API only after business onboarding,
+customer consent, an approved template, a public webhook, and an explicit cost decision. See
+[ADR 0036](docs/architecture/decisions/0036-whatsapp-direct-delivery.md).
 
 ## Project use
 

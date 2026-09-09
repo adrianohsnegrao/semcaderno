@@ -11,25 +11,35 @@ describe('MemoryMvpStore', () => {
   it('records a paid anonymous sale and its payment atomically', async () => {
     const store = new MemoryMvpStore();
     const session = await signIn(store);
+    const product = (await store.snapshot(session)).products[0]!;
+    const stockBefore = product.stockQuantity;
 
     const sale = await store.createSale(
       session,
       {
-        amountPaidCents: 2500,
+        amountPaidCents: product.priceCents,
         paymentMethod: 'pix',
-        items: [{ description: 'Compra no balcão', quantity: 1, unitPriceCents: 2500 }],
+        items: [{ productId: product.id, quantity: 1 }],
       },
       'paid_sale_001',
     );
     const state = await store.snapshot(session);
 
-    expect(sale).toMatchObject({ totalCents: 2500, outstandingCents: 0, status: 'paid' });
+    expect(sale).toMatchObject({
+      totalCents: product.priceCents,
+      outstandingCents: 0,
+      status: 'paid',
+    });
     expect(state.payments.some((payment) => payment.saleId === sale.id)).toBe(true);
+    expect(state.products.find((item) => item.id === product.id)?.stockQuantity).toBe(
+      stockBefore - 1,
+    );
   });
 
   it('requires a customer whenever a sale leaves debt', async () => {
     const store = new MemoryMvpStore();
     const session = await signIn(store);
+    const product = (await store.snapshot(session)).products[0]!;
 
     await expect(
       store.createSale(
@@ -37,7 +47,7 @@ describe('MemoryMvpStore', () => {
         {
           amountPaidCents: 0,
           paymentMethod: 'cash',
-          items: [{ description: 'Fiado sem cliente', quantity: 1, unitPriceCents: 1000 }],
+          items: [{ productId: product.id, quantity: 1 }],
         },
         'unowned_debt_001',
       ),
@@ -49,13 +59,18 @@ describe('MemoryMvpStore', () => {
     const session = await signIn(store);
     const state = await store.snapshot(session);
     const customerId = state.customers[0]!.id;
+    const product = await store.createProduct(
+      session,
+      { name: 'Compra parcial', priceCents: 2_000, stockQuantity: 3 },
+      'partial_product_001',
+    );
     const sale = await store.createSale(
       session,
       {
         customerId,
         amountPaidCents: 500,
         paymentMethod: 'cash',
-        items: [{ description: 'Compra parcial', quantity: 1, unitPriceCents: 2000 }],
+        items: [{ productId: product.id, quantity: 1 }],
       },
       'partial_sale_001',
     );
@@ -134,5 +149,90 @@ describe('MemoryMvpStore', () => {
 
     expect(cancelled).toMatchObject({ status: 'cancelled', outstandingCents: 0 });
     expect(after.sales.some((candidate) => candidate.id === sale.id)).toBe(true);
+  });
+
+  it('edits catalog data, rejects duplicates, and restores stock after cancellation', async () => {
+    const store = new MemoryMvpStore();
+    const session = await signIn(store);
+    const created = await store.createProduct(
+      session,
+      { name: 'Água mineral', priceCents: 350, stockQuantity: 4 },
+      'new_product_001',
+    );
+    await expect(
+      store.createProduct(
+        session,
+        { name: '  água MINERAL ', priceCents: 400, stockQuantity: 2 },
+        'duplicate_product_001',
+      ),
+    ).rejects.toThrow(MvpConflictError);
+    const updated = await store.updateProduct(
+      session,
+      created.id,
+      { name: 'Água mineral 500 ml', priceCents: 400, stockQuantity: 5 },
+      'update_product_001',
+    );
+    expect(updated).toMatchObject({ priceCents: 400, stockQuantity: 5 });
+
+    const sale = await store.createSale(
+      session,
+      {
+        amountPaidCents: 800,
+        paymentMethod: 'pix',
+        items: [{ productId: created.id, quantity: 2 }],
+      },
+      'stock_sale_001',
+    );
+    expect(
+      (await store.snapshot(session)).products.find((item) => item.id === created.id),
+    ).toMatchObject({ stockQuantity: 3 });
+    await expect(
+      store.createSale(
+        session,
+        {
+          amountPaidCents: 1_600,
+          paymentMethod: 'pix',
+          items: [{ productId: created.id, quantity: 4 }],
+        },
+        'stock_sale_too_large_001',
+      ),
+    ).rejects.toThrow(MvpValidationError);
+    await store.cancelSale(
+      session,
+      { saleId: sale.id, reason: 'Teste de devolução ao estoque' },
+      'stock_cancel_001',
+    );
+    expect(
+      (await store.snapshot(session)).products.find((item) => item.id === created.id),
+    ).toMatchObject({ stockQuantity: 5 });
+  });
+
+  it('normalizes WhatsApp numbers and prevents duplicate customer contacts', async () => {
+    const store = new MemoryMvpStore();
+    const session = await signIn(store);
+    const customer = await store.createCustomer(
+      session,
+      { name: 'Pessoa nova', phone: '(92) 98165-9847' },
+      'phone_customer_001',
+    );
+    expect(customer.phone).toBe('5592981659847');
+    await expect(
+      store.createCustomer(
+        session,
+        { name: 'Pessoa duplicada', phone: '+55 92 98165-9847' },
+        'phone_customer_duplicate_001',
+      ),
+    ).rejects.toThrow(MvpConflictError);
+    const edited = await store.updateCustomer(
+      session,
+      customer.id,
+      { name: 'Pessoa editada', phone: '(92) 98888-7777', note: 'Cliente frequente' },
+      'phone_customer_update_001',
+    );
+    expect(edited).toMatchObject({
+      name: 'Pessoa editada',
+      phone: '5592988887777',
+      note: 'Cliente frequente',
+    });
   });
 });

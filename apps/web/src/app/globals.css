@@ -463,6 +463,12 @@ button {
 .activity-dot.correction:after {
   background: var(--red);
 }
+.activity-dot.stock {
+  background: #edf2fa;
+}
+.activity-dot.stock:after {
+  background: var(--blue);
+}
 .activity-list strong,
 .list-lines strong {
   font-size: 13px;
@@ -567,6 +573,10 @@ select:focus {
   border-color: var(--green);
   box-shadow: 0 0 0 3px #3b8c6120;
 }
+input[readonly] {
+  background: #f2f4f1;
+  color: #526159;
+}
 label small {
   color: #849088;
   font-weight: 400;
@@ -577,6 +587,52 @@ label small {
   gap: 10px;
   align-items: end;
   margin-bottom: 12px;
+}
+.autocomplete-field {
+  position: relative;
+}
+.autocomplete-menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% - 1px);
+  left: 0;
+  right: 0;
+  max-height: 230px;
+  overflow-y: auto;
+  border: 1px solid #b8cdbd;
+  border-radius: 0 0 10px 10px;
+  background: #fff;
+  box-shadow: 0 10px 24px #173a2818;
+}
+.autocomplete-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid #edf1ed;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+}
+.autocomplete-menu button:hover,
+.autocomplete-menu button[aria-selected='true'] {
+  background: var(--green-soft);
+}
+.autocomplete-menu button small {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.autocomplete-empty {
+  display: block;
+  padding: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
 }
 .remove {
   height: 44px;
@@ -735,6 +791,9 @@ label small {
   gap: 15px;
 }
 .product-card {
+  width: 100%;
+  color: inherit;
+  text-align: left;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -742,6 +801,10 @@ label small {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+.product-card:hover {
+  border-color: #a9c5b3;
+  box-shadow: 0 8px 24px #173a2810;
 }
 .product-visual {
   width: 59px;
@@ -760,6 +823,13 @@ label small {
 .product-card strong,
 .product-card small {
   display: block;
+}
+.edit-hint {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 700;
 }
 .product-card small {
   font-size: 10px;

@@ -2,6 +2,8 @@
 
 import { type FormEvent, type ReactNode, useState } from 'react';
 
+import { formatMoneyInput } from './model';
+
 export function Icon({ name }: { name: string }) {
   const paths: Record<string, ReactNode> = {
     home: (
@@ -83,7 +85,9 @@ export function SimpleForm({
             typeof value === 'string' ? value : '',
           ]),
         );
-        void submit(values).finally(() => setBusy(false));
+        void submit(values)
+          .catch(() => undefined)
+          .finally(() => setBusy(false));
       }}
     >
       {fields.map(([name, label, type]) => (
@@ -94,8 +98,18 @@ export function SimpleForm({
             required={!label.includes('opcional')}
             defaultValue={defaults[name]}
             type={type === 'money' ? 'text' : type}
-            inputMode={type === 'money' ? 'decimal' : undefined}
-            placeholder={type === 'money' ? '0,00' : undefined}
+            inputMode={type === 'money' ? 'numeric' : undefined}
+            min={type === 'number' ? 0 : undefined}
+            step={type === 'number' ? 1 : undefined}
+            placeholder={type === 'money' ? 'R$ 0,00' : undefined}
+            onInput={(event) => {
+              if (type !== 'money') return;
+              event.currentTarget.value = formatMoneyInput(event.currentTarget.value);
+              event.currentTarget.setSelectionRange(
+                event.currentTarget.value.length,
+                event.currentTarget.value.length,
+              );
+            }}
           />
         </label>
       ))}

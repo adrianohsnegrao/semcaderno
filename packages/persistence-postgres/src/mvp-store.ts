@@ -9,6 +9,7 @@ import {
   MvpNotFoundError,
   MvpValidationError,
   applyPayment as applyFinancialPayment,
+  assertStockAvailable,
   previewSale,
   type Activity,
   type BusinessSnapshot,
@@ -51,6 +52,11 @@ const booleanValue = (row: Row, key: string): boolean => {
   if (typeof value !== 'boolean') throw new Error('PostgreSQL returned an invalid row.');
   return value;
 };
+const hasConstraint = (error: unknown, constraint: string) =>
+  typeof error === 'object' &&
+  error !== null &&
+  'constraint' in error &&
+  error.constraint === constraint;
 const isoValue = (row: Row, key: string): string => {
   const value = row[key];
   if (!(value instanceof Date) || !Number.isFinite(value.getTime()))
@@ -77,6 +83,7 @@ const translateFinancialRule = (error: unknown): never => {
     PAYMENT_EXCEEDS_TOTAL: 'O valor recebido deve estar entre zero e o total da venda.',
     CUSTOMER_REQUIRED: 'Escolha um cliente para deixar valor em aberto.',
     OVERPAYMENT: 'O valor recebido não pode ser maior que o valor em aberto.',
+    INSUFFICIENT_STOCK: 'A quantidade vendida é maior que o estoque disponível.',
   };
   throw new MvpValidationError(messages[error.code]);
 };
@@ -86,6 +93,19 @@ const applyFinancialRule = <Result>(operation: () => Result): Result => {
   } catch (error) {
     return translateFinancialRule(error);
   }
+};
+const normalizedPhone = (value?: string): string | undefined => {
+  if (!value?.trim()) return undefined;
+  const digits = value.replace(/\D/g, '');
+  const international = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+  if (!/^55\d{10,11}$/.test(international))
+    throw new MvpValidationError('Informe um WhatsApp brasileiro com DDD.');
+  return international;
+};
+const assertStock = (value: number) => {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 9_999_999)
+    throw new MvpValidationError('Informe uma quantidade de estoque válida.');
+  return value;
 };
 const issueEvidence = () => ({
   token: randomBytes(32).toString('base64url'),
@@ -108,6 +128,7 @@ const mapProduct = (row: Row): Product => ({
   id: stringValue(row, 'id'),
   name: stringValue(row, 'name'),
   priceCents: integerValue(row, 'priceCents'),
+  stockQuantity: integerValue(row, 'stockQuantity'),
   active: booleanValue(row, 'active'),
   createdAt: isoValue(row, 'createdAt'),
 });
@@ -280,7 +301,7 @@ export class PostgresMvpStore implements MvpStore {
           [session.businessId],
         ),
         this.pool.query<Row>(
-          `SELECT id,display_name AS name,price_cents AS "priceCents",active,created_at AS "createdAt" FROM sem_caderno.products WHERE business_id=$1 ORDER BY active DESC,display_name`,
+          `SELECT id,display_name AS name,price_cents AS "priceCents",stock_quantity AS "stockQuantity",active,created_at AS "createdAt" FROM sem_caderno.products WHERE business_id=$1 ORDER BY active DESC,display_name`,
           [session.businessId],
         ),
         this.pool.query<Row>(
@@ -369,63 +390,150 @@ export class PostgresMvpStore implements MvpStore {
     input: Readonly<{ name: string; phone?: string; note?: string }>,
     key: string,
   ): Promise<Customer> {
+    const phone = normalizedPhone(input.phone);
     const validated = {
       name: assertText(input.name, 'Nome do cliente'),
-      ...(input.phone?.trim() ? { phone: input.phone.replace(/\D/g, '') } : {}),
+      ...(phone ? { phone } : {}),
       ...(input.note?.trim() ? { note: assertText(input.note, 'Observação', 300) } : {}),
     };
-    return this.once(session, key, validated, async (client) => {
-      const result = await client.query<Row>(
-        `INSERT INTO sem_caderno.customers (business_id,display_name,phone,note,created_at) VALUES ($1,$2,$3,$4,now()) RETURNING id,display_name AS name,phone,note,active,created_at AS "createdAt"`,
-        [session.businessId, validated.name, validated.phone ?? null, validated.note ?? null],
-      );
-      return mapCustomer(result.rows[0]!);
-    });
+    try {
+      return await this.once(session, key, validated, async (client) => {
+        const result = await client.query<Row>(
+          `INSERT INTO sem_caderno.customers (business_id,display_name,phone,note,created_at) VALUES ($1,$2,$3,$4,now()) RETURNING id,display_name AS name,phone,note,active,created_at AS "createdAt"`,
+          [session.businessId, validated.name, validated.phone ?? null, validated.note ?? null],
+        );
+        return mapCustomer(result.rows[0]!);
+      });
+    } catch (error) {
+      if (hasConstraint(error, 'customers_business_phone_unique'))
+        throw new MvpConflictError('Já existe um cliente com este WhatsApp.');
+      throw error;
+    }
+  }
+
+  async updateCustomer(
+    session: PublicSession,
+    customerId: string,
+    input: Readonly<{ name: string; phone?: string; note?: string }>,
+    key: string,
+  ): Promise<Customer> {
+    const phone = normalizedPhone(input.phone);
+    const validated = {
+      customerId,
+      name: assertText(input.name, 'Nome do cliente'),
+      ...(phone ? { phone } : {}),
+      ...(input.note?.trim() ? { note: assertText(input.note, 'Observação', 300) } : {}),
+    };
+    try {
+      return await this.once(session, key, validated, async (client) => {
+        const result = await client.query<Row>(
+          `UPDATE sem_caderno.customers SET display_name=$1,phone=$2,note=$3 WHERE id=$4 AND business_id=$5 RETURNING id,display_name AS name,phone,note,active,created_at AS "createdAt"`,
+          [
+            validated.name,
+            validated.phone ?? null,
+            validated.note ?? null,
+            customerId,
+            session.businessId,
+          ],
+        );
+        if (!result.rows[0]) throw new MvpNotFoundError('Cliente não encontrado.');
+        return mapCustomer(result.rows[0]);
+      });
+    } catch (error) {
+      if (hasConstraint(error, 'customers_business_phone_unique'))
+        throw new MvpConflictError('Já existe um cliente com este WhatsApp.');
+      throw error;
+    }
   }
 
   async createProduct(
     session: PublicSession,
-    input: Readonly<{ name: string; priceCents: number }>,
+    input: Readonly<{ name: string; priceCents: number; stockQuantity: number }>,
     key: string,
   ): Promise<Product> {
     const validated = {
       name: assertText(input.name, 'Nome do produto'),
       priceCents: assertCents(input.priceCents, 'Preço'),
+      stockQuantity: assertStock(input.stockQuantity),
     };
-    return this.once(session, key, validated, async (client) => {
-      const result = await client.query<Row>(
-        `INSERT INTO sem_caderno.products (business_id,display_name,price_cents,created_at) VALUES ($1,$2,$3,now()) RETURNING id,display_name AS name,price_cents AS "priceCents",active,created_at AS "createdAt"`,
-        [session.businessId, validated.name, validated.priceCents],
-      );
-      return mapProduct(result.rows[0]!);
-    });
+    try {
+      return await this.once(session, key, validated, async (client) => {
+        const result = await client.query<Row>(
+          `INSERT INTO sem_caderno.products (business_id,display_name,price_cents,stock_quantity,created_at) VALUES ($1,$2,$3,$4,now()) RETURNING id,display_name AS name,price_cents AS "priceCents",stock_quantity AS "stockQuantity",active,created_at AS "createdAt"`,
+          [session.businessId, validated.name, validated.priceCents, validated.stockQuantity],
+        );
+        return mapProduct(result.rows[0]!);
+      });
+    } catch (error) {
+      if (hasConstraint(error, 'products_business_normalized_name_unique'))
+        throw new MvpConflictError('Já existe um produto com este nome.');
+      throw error;
+    }
+  }
+
+  async updateProduct(
+    session: PublicSession,
+    productId: string,
+    input: Readonly<{ name: string; priceCents: number; stockQuantity: number }>,
+    key: string,
+  ): Promise<Product> {
+    const validated = {
+      productId,
+      name: assertText(input.name, 'Nome do produto'),
+      priceCents: assertCents(input.priceCents, 'Preço'),
+      stockQuantity: assertStock(input.stockQuantity),
+    };
+    try {
+      return await this.once(session, key, validated, async (client) => {
+        const previous = await client.query<Row>(
+          `SELECT display_name AS name,stock_quantity AS "stockQuantity" FROM sem_caderno.products WHERE id=$1 AND business_id=$2 FOR UPDATE`,
+          [productId, session.businessId],
+        );
+        if (!previous.rows[0]) throw new MvpNotFoundError('Produto não encontrado.');
+        const result = await client.query<Row>(
+          `UPDATE sem_caderno.products SET display_name=$1,price_cents=$2,stock_quantity=$3 WHERE id=$4 AND business_id=$5 RETURNING id,display_name AS name,price_cents AS "priceCents",stock_quantity AS "stockQuantity",active,created_at AS "createdAt"`,
+          [
+            validated.name,
+            validated.priceCents,
+            validated.stockQuantity,
+            productId,
+            session.businessId,
+          ],
+        );
+        const product = mapProduct(result.rows[0]!);
+        const oldStock = integerValue(previous.rows[0], 'stockQuantity');
+        if (oldStock !== product.stockQuantity)
+          await this.activity(
+            client,
+            session,
+            'stock',
+            'Estoque ajustado',
+            `${product.name}: ${oldStock} → ${product.stockQuantity}`,
+          );
+        return product;
+      });
+    } catch (error) {
+      if (hasConstraint(error, 'products_business_normalized_name_unique'))
+        throw new MvpConflictError('Já existe um produto com este nome.');
+      throw error;
+    }
   }
 
   async createSale(session: PublicSession, input: SaleDraft, key: string): Promise<Sale> {
     if (input.items.length < 1 || input.items.length > 30)
       throw new MvpValidationError('Adicione pelo menos um item à venda.');
-    const items = input.items.map((item) => {
+    const requested = input.items.map((item) => {
+      const productId = assertText(item.productId, 'Produto');
       const quantity = item.quantity;
-      const unitPriceCents = assertCents(item.unitPriceCents, 'Valor do item');
       if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 999)
         throw new MvpValidationError('A quantidade do item não é válida.');
-      return {
-        ...(item.productId ? { productId: item.productId } : {}),
-        description: assertText(item.description, 'Descrição do item'),
-        quantity,
-        unitPriceCents,
-        totalCents: quantity * unitPriceCents,
-      };
+      return { productId, quantity };
     });
-    const preview = applyFinancialRule(() =>
-      previewSale(items, input.amountPaidCents, input.customerId !== undefined),
-    );
     const validated = {
       ...(input.customerId ? { customerId: input.customerId } : {}),
       amountPaidCents: input.amountPaidCents,
       paymentMethod: input.paymentMethod,
-      items,
-      totalCents: preview.totalCents,
+      items: requested,
     };
     return this.once(session, key, validated, async (client) => {
       if (validated.customerId) {
@@ -436,17 +544,37 @@ export class PostgresMvpStore implements MvpStore {
         if (!customer.rowCount)
           throw new MvpNotFoundError('Cliente não encontrado neste estabelecimento.');
       }
-      const productIds = [
-        ...new Set(items.flatMap((item) => (item.productId ? [item.productId] : []))),
-      ];
-      if (productIds.length > 0) {
-        const products = await client.query<{ id: string }>(
-          `SELECT id FROM sem_caderno.products WHERE business_id=$1 AND active AND id=ANY($2::uuid[])`,
-          [session.businessId, productIds],
+      const quantities = new Map<string, number>();
+      for (const item of requested)
+        quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity);
+      const productIds = [...quantities.keys()];
+      const products = await client.query<Row>(
+        `SELECT id,display_name AS name,price_cents AS "priceCents",stock_quantity AS "stockQuantity" FROM sem_caderno.products WHERE business_id=$1 AND active AND id=ANY($2::uuid[]) FOR UPDATE`,
+        [session.businessId, productIds],
+      );
+      if (products.rowCount !== productIds.length)
+        throw new MvpNotFoundError('Produto não encontrado neste estabelecimento.');
+      const catalog = new Map(products.rows.map((row) => [stringValue(row, 'id'), row]));
+      for (const [productId, quantity] of quantities) {
+        const product = catalog.get(productId)!;
+        applyFinancialRule(() =>
+          assertStockAvailable(integerValue(product, 'stockQuantity'), quantity),
         );
-        if (products.rowCount !== productIds.length)
-          throw new MvpNotFoundError('Produto não encontrado neste estabelecimento.');
       }
+      const items = requested.map((item) => {
+        const product = catalog.get(item.productId)!;
+        const unitPriceCents = integerValue(product, 'priceCents');
+        return {
+          productId: item.productId,
+          description: stringValue(product, 'name'),
+          quantity: item.quantity,
+          unitPriceCents,
+          totalCents: item.quantity * unitPriceCents,
+        };
+      });
+      const preview = applyFinancialRule(() =>
+        previewSale(items, input.amountPaidCents, input.customerId !== undefined),
+      );
       const saleResult = await client.query<Row>(
         `INSERT INTO sem_caderno.sales (business_id,customer_id,total_cents,paid_cents,status,created_at) VALUES ($1,$2,$3,$4,$5,now()) RETURNING id,created_at AS "createdAt"`,
         [
@@ -464,7 +592,7 @@ export class PostgresMvpStore implements MvpStore {
           `INSERT INTO sem_caderno.sale_items (sale_id,product_id,description_snapshot,quantity,unit_price_cents,total_cents) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
           [
             saleId,
-            item.productId ?? null,
+            item.productId,
             item.description,
             item.quantity,
             item.unitPriceCents,
@@ -473,6 +601,11 @@ export class PostgresMvpStore implements MvpStore {
         );
         mappedItems.push({ id: stringValue(row.rows[0]!, 'id'), ...item });
       }
+      for (const [productId, quantity] of quantities)
+        await client.query(
+          `UPDATE sem_caderno.products SET stock_quantity=stock_quantity-$1 WHERE id=$2 AND business_id=$3`,
+          [quantity, productId, session.businessId],
+        );
       if (validated.amountPaidCents > 0)
         await client.query(
           `INSERT INTO sem_caderno.payments (business_id,sale_id,amount_cents,method,created_at) VALUES ($1,$2,$3,$4,now())`,
@@ -598,6 +731,15 @@ export class PostgresMvpStore implements MvpStore {
       );
       const row = result.rows[0];
       if (!row) throw new MvpNotFoundError('Venda não encontrada ou já cancelada.');
+      const stockItems = await client.query<Row>(
+        `SELECT product_id AS "productId",SUM(quantity)::integer AS quantity FROM sem_caderno.sale_items WHERE sale_id=$1 AND product_id IS NOT NULL GROUP BY product_id`,
+        [validated.saleId],
+      );
+      for (const item of stockItems.rows)
+        await client.query(
+          `UPDATE sem_caderno.products SET stock_quantity=stock_quantity+$1 WHERE id=$2 AND business_id=$3`,
+          [integerValue(item, 'quantity'), stringValue(item, 'productId'), session.businessId],
+        );
       await this.activity(
         client,
         session,

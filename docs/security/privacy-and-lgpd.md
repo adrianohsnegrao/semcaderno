@@ -189,7 +189,10 @@ Requirements for future implementation planning:
 - Raw idempotency keys, command fingerprints, cookies, CSRF tokens, and recovery evidence must not be used as support or observability correlation identifiers.
 - The physical PostgreSQL model uses one restricted application schema, global User identity, explicit `business_id` propagation, and composite tenant foreign keys; those controls complement but never replace current application authorization.
 - Session, CSRF, verification, recovery, Invitation, and idempotency bearer values are stored only as keyed digests with version/expiry evidence. Raw bearer values are prohibited in PostgreSQL, audit, logs, traces, analytics, and support tools.
-- Customer contact indexes remain Business-scoped and non-unique. Payment Request destinations require encrypted storage plus only a digest and masked hint where lookup/display is necessary.
+- Customer WhatsApp uniqueness is enforced only inside the active Business after normalization;
+  this prevents operational duplicates without making contact data a global identity. Payment
+  Request destinations require encrypted storage plus only a digest and masked hint where
+  lookup/display is necessary.
 - Runtime roles cannot ordinarily delete financial history or update append-only audit/correction/outcome evidence. Migration and repair roles are separate, least-privileged, and audited.
 - Command outcomes retain safe typed references rather than full request/response payloads. Authoritative recovery never relies on logs, process memory, or personal-data search.
 - Transactional external-effect intent and delivery-attempt evidence are provider-neutral and contain no raw provider secret or unnecessary payload.

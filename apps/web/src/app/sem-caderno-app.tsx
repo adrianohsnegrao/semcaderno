@@ -180,6 +180,14 @@ export function SemCadernoApp() {
           <Customers
             data={snapshot}
             create={(body) => mutate('/api/mvp/customers', body, 'Cliente adicionado.')}
+            update={(customerId, body) =>
+              mutate(
+                `/api/mvp/customers/${customerId}`,
+                body,
+                'Dados do cliente atualizados.',
+                'PUT',
+              )
+            }
             pay={(body) => mutate('/api/mvp/payments', body, 'Pagamento registrado.')}
             collect={(body) =>
               mutate(
@@ -194,6 +202,9 @@ export function SemCadernoApp() {
           <Products
             data={snapshot}
             create={(body) => mutate('/api/mvp/products', body, 'Produto adicionado.')}
+            update={(productId, body) =>
+              mutate(`/api/mvp/products/${productId}`, body, 'Produto atualizado.', 'PUT')
+            }
           />
         )}
         {view === 'expenses' && (

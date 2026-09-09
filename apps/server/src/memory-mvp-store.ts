@@ -8,6 +8,7 @@ import {
   MvpNotFoundError,
   MvpValidationError,
   applyPayment as applyFinancialPayment,
+  assertStockAvailable,
   previewSale,
   type Activity,
   type BusinessSnapshot,
@@ -68,6 +69,7 @@ const translateFinancialRule = (error: unknown): never => {
     PAYMENT_EXCEEDS_TOTAL: 'O valor recebido deve estar entre zero e o total da venda.',
     CUSTOMER_REQUIRED: 'Escolha um cliente para deixar valor em aberto.',
     OVERPAYMENT: 'O valor recebido não pode ser maior que o valor em aberto.',
+    INSUFFICIENT_STOCK: 'A quantidade vendida é maior que o estoque disponível.',
   };
   throw new MvpValidationError(messages[error.code]);
 };
@@ -78,6 +80,22 @@ const applyFinancialRule = <Result>(operation: () => Result): Result => {
   } catch (error) {
     return translateFinancialRule(error);
   }
+};
+
+const normalizedName = (value: string) =>
+  value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+const normalizedPhone = (value?: string): string | undefined => {
+  if (!value?.trim()) return undefined;
+  const digits = value.replace(/\D/g, '');
+  const international = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+  if (!/^55\d{10,11}$/.test(international))
+    throw new MvpValidationError('Informe um WhatsApp brasileiro com DDD.');
+  return international;
+};
+const assertStock = (value: number) => {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 9_999_999)
+    throw new MvpValidationError('Informe uma quantidade de estoque válida.');
+  return value;
 };
 
 const makeSession = (snapshot: MutableSnapshot): PublicSession => ({
@@ -110,8 +128,22 @@ const seedSnapshot = (): MutableSnapshot => {
     { id: joaoId, name: 'João Lima', phone: '5592988882222', active: true, createdAt: yesterday },
   ];
   const products: Product[] = [
-    { id: cafeId, name: 'Café com leite', priceCents: 800, active: true, createdAt: earlier },
-    { id: lancheId, name: 'Misto quente', priceCents: 1200, active: true, createdAt: earlier },
+    {
+      id: cafeId,
+      name: 'Café com leite',
+      priceCents: 800,
+      stockQuantity: 27,
+      active: true,
+      createdAt: earlier,
+    },
+    {
+      id: lancheId,
+      name: 'Misto quente',
+      priceCents: 1200,
+      stockQuantity: 18,
+      active: true,
+      createdAt: earlier,
+    },
   ];
   const sales: Sale[] = [
     {
@@ -303,10 +335,13 @@ export class MemoryMvpStore implements MvpStore {
   ): Promise<Customer> {
     return this.once(session, key, input, () => {
       const snapshot = this.requireAccount(session).snapshot;
+      const phone = normalizedPhone(input.phone);
+      if (phone && snapshot.customers.some((customer) => customer.phone === phone))
+        throw new MvpConflictError('Já existe um cliente com este WhatsApp.');
       const customer: Customer = {
         id: randomUUID(),
         name: assertText(input.name, 'Nome do cliente'),
-        ...(input.phone?.trim() ? { phone: input.phone.replace(/\D/g, '') } : {}),
+        ...(phone ? { phone } : {}),
         ...(input.note?.trim() ? { note: assertText(input.note, 'Observação', 300) } : {}),
         active: true,
         createdAt: now(),
@@ -316,17 +351,55 @@ export class MemoryMvpStore implements MvpStore {
     });
   }
 
+  async updateCustomer(
+    session: PublicSession,
+    customerId: string,
+    input: Readonly<{ name: string; phone?: string; note?: string }>,
+    key: string,
+  ): Promise<Customer> {
+    return this.once(session, key, { customerId, ...input }, () => {
+      const snapshot = this.requireAccount(session).snapshot;
+      const index = snapshot.customers.findIndex((customer) => customer.id === customerId);
+      const current = snapshot.customers[index];
+      if (!current) throw new MvpNotFoundError('Cliente não encontrado.');
+      const phone = normalizedPhone(input.phone);
+      if (
+        phone &&
+        snapshot.customers.some(
+          (customer) => customer.id !== customerId && customer.phone === phone,
+        )
+      )
+        throw new MvpConflictError('Já existe um cliente com este WhatsApp.');
+      const updated: Customer = {
+        ...current,
+        name: assertText(input.name, 'Nome do cliente'),
+        ...(phone ? { phone } : {}),
+        ...(input.note?.trim() ? { note: assertText(input.note, 'Observação', 300) } : {}),
+      };
+      if (!phone) delete (updated as { phone?: string }).phone;
+      if (!input.note?.trim()) delete (updated as { note?: string }).note;
+      snapshot.customers[index] = updated;
+      return updated;
+    });
+  }
+
   async createProduct(
     session: PublicSession,
-    input: Readonly<{ name: string; priceCents: number }>,
+    input: Readonly<{ name: string; priceCents: number; stockQuantity: number }>,
     key: string,
   ): Promise<Product> {
     return this.once(session, key, input, () => {
       const snapshot = this.requireAccount(session).snapshot;
+      const name = assertText(input.name, 'Nome do produto');
+      if (
+        snapshot.products.some((product) => normalizedName(product.name) === normalizedName(name))
+      )
+        throw new MvpConflictError('Já existe um produto com este nome.');
       const product: Product = {
         id: randomUUID(),
-        name: assertText(input.name, 'Nome do produto'),
+        name,
         priceCents: assertCents(input.priceCents, 'Preço'),
+        stockQuantity: assertStock(input.stockQuantity),
         active: true,
         createdAt: now(),
       };
@@ -335,23 +408,73 @@ export class MemoryMvpStore implements MvpStore {
     });
   }
 
+  async updateProduct(
+    session: PublicSession,
+    productId: string,
+    input: Readonly<{ name: string; priceCents: number; stockQuantity: number }>,
+    key: string,
+  ): Promise<Product> {
+    return this.once(session, key, { productId, ...input }, () => {
+      const snapshot = this.requireAccount(session).snapshot;
+      const index = snapshot.products.findIndex((product) => product.id === productId);
+      const current = snapshot.products[index];
+      if (!current) throw new MvpNotFoundError('Produto não encontrado.');
+      const name = assertText(input.name, 'Nome do produto');
+      if (
+        snapshot.products.some(
+          (product) =>
+            product.id !== productId && normalizedName(product.name) === normalizedName(name),
+        )
+      )
+        throw new MvpConflictError('Já existe um produto com este nome.');
+      const updated = {
+        ...current,
+        name,
+        priceCents: assertCents(input.priceCents, 'Preço'),
+        stockQuantity: assertStock(input.stockQuantity),
+      };
+      snapshot.products[index] = updated;
+      if (updated.stockQuantity !== current.stockQuantity)
+        snapshot.activities.unshift({
+          id: randomUUID(),
+          kind: 'stock',
+          title: 'Estoque ajustado',
+          detail: `${updated.name}: ${current.stockQuantity} → ${updated.stockQuantity}`,
+          createdAt: now(),
+        });
+      return updated;
+    });
+  }
+
   async createSale(session: PublicSession, input: SaleDraft, key: string): Promise<Sale> {
     return this.once(session, key, input, () => {
       const snapshot = this.requireAccount(session).snapshot;
       if (input.items.length < 1 || input.items.length > 30)
         throw new MvpValidationError('Adicione pelo menos um item à venda.');
+      const requestedByProduct = new Map<string, number>();
+      for (const item of input.items)
+        requestedByProduct.set(
+          item.productId,
+          (requestedByProduct.get(item.productId) ?? 0) + item.quantity,
+        );
       const items = input.items.map((item) => {
         const quantity = item.quantity;
-        const unitPriceCents = assertCents(item.unitPriceCents, 'Valor do item');
         if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 999)
           throw new MvpValidationError('A quantidade do item não é válida.');
+        const product = snapshot.products.find(
+          (candidate) => candidate.id === item.productId && candidate.active,
+        );
+        if (!product) throw new MvpNotFoundError('Produto não encontrado neste estabelecimento.');
+        applyFinancialRule(() =>
+          assertStockAvailable(product.stockQuantity, requestedByProduct.get(product.id) ?? 0),
+        );
         return {
           id: randomUUID(),
-          ...(item.productId ? { productId: item.productId } : {}),
-          description: assertText(item.description, 'Descrição do item'),
+          productId: product.id,
+          description: product.name,
           quantity,
-          unitPriceCents,
-          totalCents: quantity * unitPriceCents,
+          unitPriceCents: product.priceCents,
+          totalCents: quantity * product.priceCents,
         };
       });
       const preview = applyFinancialRule(() =>
@@ -363,6 +486,13 @@ export class MemoryMvpStore implements MvpStore {
         !snapshot.customers.some((customer) => customer.id === input.customerId && customer.active)
       )
         throw new MvpNotFoundError('Cliente não encontrado neste estabelecimento.');
+      for (const [productId, quantity] of requestedByProduct) {
+        const productIndex = snapshot.products.findIndex((product) => product.id === productId);
+        snapshot.products[productIndex] = {
+          ...snapshot.products[productIndex]!,
+          stockQuantity: snapshot.products[productIndex]!.stockQuantity - quantity,
+        };
+      }
       const sale: Sale = {
         id: randomUUID(),
         ...(input.customerId ? { customerId: input.customerId } : {}),
@@ -496,6 +626,17 @@ export class MemoryMvpStore implements MvpStore {
         cancellationReason: reason,
       };
       snapshot.sales[index] = cancelled;
+      for (const item of sale.items) {
+        if (!item.productId) continue;
+        const productIndex = snapshot.products.findIndex(
+          (product) => product.id === item.productId,
+        );
+        if (productIndex >= 0)
+          snapshot.products[productIndex] = {
+            ...snapshot.products[productIndex]!,
+            stockQuantity: snapshot.products[productIndex]!.stockQuantity + item.quantity,
+          };
+      }
       snapshot.activities.unshift({
         id: randomUUID(),
         kind: 'correction',

@@ -39,6 +39,7 @@ export {
 export {
   FinancialRuleError,
   applyPayment,
+  assertStockAvailable,
   previewSale,
   simpleCashResult,
   type SaleFinancialPreview,

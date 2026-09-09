@@ -30,9 +30,13 @@ sob controle humano.
 - criação de conta e estabelecimento;
 - entrada e saída segura da conta;
 - painel com entradas, saídas, saldo simples e total em aberto;
-- cadastro de clientes e produtos;
+- cadastro e edição de clientes e produtos;
+- bloqueio de produtos repetidos e de WhatsApp duplicado por estabelecimento;
+- preços em reais com máscara automática, sem exigir ponto ou vírgula;
+- estoque simples por produto, com baixa atômica na venda e devolução no cancelamento;
 - venda paga, parcialmente paga ou fiada;
-- itens avulsos, sem exigir catálogo antes da primeira venda;
+- busca com sugestões que aceita somente produtos ativos, disponíveis e cadastrados;
+- preço da venda resolvido pelo servidor a partir do catálogo, sem confiar no navegador;
 - histórico de compras por cliente;
 - pagamentos posteriores, parciais ou completos;
 - bloqueio de pagamento maior que a dívida;
@@ -124,7 +128,9 @@ Segredos e arquivos `.env` não são versionados.
 flowchart LR
     A[Entrar] --> B[Visão de hoje]
     B --> C[Registrar venda]
-    C --> D{Pagamento}
+    C --> K[Selecionar produto do catálogo]
+    K --> L[Validar preço e estoque no servidor]
+    L --> D{Pagamento}
     D -->|Pago| E[Entrada registrada]
     D -->|Parte paga| F[Valor restante em aberto]
     D -->|Fiado| F
@@ -173,6 +179,8 @@ silenciosamente para o modo demonstração em ambiente de produção.
 - Venda com valor em aberto exige cliente.
 - Pagamentos não podem ultrapassar o restante da venda.
 - Cancelamentos preservam o registro original e exigem motivo.
+- A API, e não o navegador, define nome e preço do produto vendido.
+- A baixa de estoque ocorre na mesma transação da venda; cancelamento repõe as unidades.
 
 ### Operações seguras
 
@@ -180,6 +188,7 @@ silenciosamente para o modo demonstração em ambiente de produção.
 - A mesma intenção pode ser repetida sem duplicar registros.
 - A mesma chave com dados diferentes é rejeitada.
 - Escritas relacionadas ocorrem em uma transação no PostgreSQL.
+- Restrições únicas no banco reforçam a proteção contra produto e WhatsApp duplicados.
 - Atividades registram o resultado em linguagem compreensível.
 
 ### Autenticação e proteção web
@@ -222,7 +231,8 @@ O gate completo verifica:
 - regras de dependência entre camadas;
 - contratos e casos de uso;
 - API e segurança de sessão;
-- regras do MVP, incluindo fiado, pagamento excessivo, lembrete sem baixa e idempotência;
+- regras do MVP, incluindo fiado, pagamento excessivo, catálogo, estoque, duplicidade, lembrete sem
+  baixa e idempotência;
 - adaptadores PostgreSQL em banco real quando a infraestrutura de teste está disponível;
 - build de todos os pacotes, API, migrações e interface;
 - ordem e checksum das migrações.
@@ -237,7 +247,7 @@ Não fazem parte desta versão:
 - emissão de nota fiscal;
 - contabilidade, DRE ou conciliação bancária;
 - baixa automática de Pix;
-- estoque e compras complexas;
+- compras, fornecedores, lotes e estoque complexo;
 - iFood, cozinha, mesas, impressora ou fidelidade;
 - envio automático de WhatsApp;
 - aplicativo móvel nativo;
@@ -254,6 +264,7 @@ O recorte é intencional: validar o valor do caderno digital antes de crescer pa
 - [Especificação da entrega executável](docs/specs/mvp-release-implementation.md)
 - [Arquitetura](docs/architecture/architecture.md)
 - [Decisões arquiteturais](docs/architecture/decisions/README.md)
+- [Decisão sobre envio direto por WhatsApp](docs/architecture/decisions/0036-whatsapp-direct-delivery.md)
 - [Privacidade e LGPD](docs/security/privacy-and-lgpd.md)
 - [Estratégia de testes](docs/quality/test-strategy.md)
 

@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 
-import { MvpConflictError, MvpNotFoundError } from '@sem-caderno/application';
+import { MvpConflictError, MvpNotFoundError, MvpValidationError } from '@sem-caderno/application';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Pool } from 'pg';
 
@@ -62,7 +62,7 @@ describe('PostgresMvpStore', () => {
 
     const product = await store.createProduct(
       session,
-      { name: 'Cesta básica', priceCents: 12_500 },
+      { name: 'Cesta básica', priceCents: 12_500, stockQuantity: 10 },
       'product-key-001',
     );
     const sale = await store.createSale(
@@ -71,14 +71,7 @@ describe('PostgresMvpStore', () => {
         customerId: customer.id,
         amountPaidCents: 5_000,
         paymentMethod: 'pix',
-        items: [
-          {
-            productId: product.id,
-            description: product.name,
-            quantity: 1,
-            unitPriceCents: product.priceCents,
-          },
-        ],
+        items: [{ productId: product.id, quantity: 1 }],
       },
       'sale-key-000001',
     );
@@ -112,6 +105,7 @@ describe('PostgresMvpStore', () => {
     expect(snapshot.activities.map((activity) => activity.kind)).toEqual(
       expect.arrayContaining(['sale', 'payment', 'expense', 'collection']),
     );
+    expect(snapshot.products[0]).toMatchObject({ id: product.id, stockQuantity: 9 });
 
     expect(await store.session(session.token)).toMatchObject({ userId: session.userId });
     await store.signOut(session.token);
@@ -137,6 +131,11 @@ describe('PostgresMvpStore', () => {
       { name: 'Cliente exclusivo A' },
       'tenant-customer-a',
     );
+    const productB = await store.createProduct(
+      ownerB,
+      { name: 'Item B', priceCents: 1_000, stockQuantity: 2 },
+      'tenant-product-b',
+    );
 
     await expect(
       store.createSale(
@@ -145,10 +144,90 @@ describe('PostgresMvpStore', () => {
           customerId: customerA.id,
           amountPaidCents: 0,
           paymentMethod: 'other',
-          items: [{ description: 'Item B', quantity: 1, unitPriceCents: 1_000 }],
+          items: [{ productId: productB.id, quantity: 1 }],
         },
         'tenant-sale-key-b',
       ),
     ).rejects.toBeInstanceOf(MvpNotFoundError);
+  });
+
+  it('enforces normalized uniqueness and inventory changes in PostgreSQL', async () => {
+    const store = new PostgresMvpStore(currentPool());
+    const session = await store.register({
+      name: 'Dona Ana',
+      email: 'catalog-owner@example.invalid',
+      password: 'senha-segura-catalogo',
+      businessName: 'Lanche da Ana',
+    });
+    const customer = await store.createCustomer(
+      session,
+      { name: 'Cliente um', phone: '(92) 98165-9847' },
+      'catalog-customer-001',
+    );
+    await expect(
+      store.createCustomer(
+        session,
+        { name: 'Cliente dois', phone: '+55 92 98165-9847' },
+        'catalog-customer-002',
+      ),
+    ).rejects.toBeInstanceOf(MvpConflictError);
+    await store.updateCustomer(
+      session,
+      customer.id,
+      { name: 'Cliente editado', phone: '(92) 98888-7777', note: 'Busca no balcão' },
+      'catalog-customer-update',
+    );
+
+    const product = await store.createProduct(
+      session,
+      { name: 'Suco de cupuaçu', priceCents: 700, stockQuantity: 5 },
+      'catalog-product-001',
+    );
+    await expect(
+      store.createProduct(
+        session,
+        { name: '  SUCO DE CUPUAÇU ', priceCents: 750, stockQuantity: 1 },
+        'catalog-product-002',
+      ),
+    ).rejects.toBeInstanceOf(MvpConflictError);
+    await store.updateProduct(
+      session,
+      product.id,
+      { name: 'Suco de cupuaçu 500 ml', priceCents: 800, stockQuantity: 6 },
+      'catalog-product-update',
+    );
+
+    const sale = await store.createSale(
+      session,
+      {
+        amountPaidCents: 1_600,
+        paymentMethod: 'pix',
+        items: [{ productId: product.id, quantity: 2 }],
+      },
+      'catalog-sale-001',
+    );
+    expect((await store.snapshot(session)).products[0]).toMatchObject({ stockQuantity: 4 });
+    await expect(
+      store.createSale(
+        session,
+        {
+          amountPaidCents: 4_000,
+          paymentMethod: 'pix',
+          items: [{ productId: product.id, quantity: 5 }],
+        },
+        'catalog-sale-002',
+      ),
+    ).rejects.toBeInstanceOf(MvpValidationError);
+    await store.cancelSale(
+      session,
+      { saleId: sale.id, reason: 'Venda registrada por engano' },
+      'catalog-sale-cancel',
+    );
+    const after = await store.snapshot(session);
+    expect(after.products[0]).toMatchObject({ stockQuantity: 6 });
+    expect(after.customers[0]).toMatchObject({
+      name: 'Cliente editado',
+      phone: '5592988887777',
+    });
   });
 });

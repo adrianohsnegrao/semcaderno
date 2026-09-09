@@ -10,6 +10,7 @@ export type Product = {
   id: string;
   name: string;
   priceCents: number;
+  stockQuantity: number;
   active: boolean;
   createdAt: string;
 };
@@ -75,7 +76,18 @@ export const money = (cents: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
 export const shortDate = (value: string) =>
   new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' }).format(new Date(value));
-export const parseMoney = (value: string) => Math.round(Number(value.replace(',', '.')) * 100);
+export const parseMoney = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  return digits ? Number(digits) : 0;
+};
+export const formatMoneyInput = (value: string) => money(parseMoney(value));
+export const formatPhone = (value?: string) => {
+  if (!value) return '';
+  const local = value.replace(/\D/g, '').replace(/^55(?=\d{10,11}$)/, '');
+  if (local.length === 11) return `(${local.slice(0, 2)}) ${local.slice(2, 7)}-${local.slice(7)}`;
+  if (local.length === 10) return `(${local.slice(0, 2)}) ${local.slice(2, 6)}-${local.slice(6)}`;
+  return value;
+};
 const operationKey = () => crypto.randomUUID().replaceAll('-', '_');
 
 export async function request<T>(

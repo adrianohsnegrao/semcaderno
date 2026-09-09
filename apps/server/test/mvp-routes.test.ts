@@ -103,6 +103,71 @@ describe('MVP HTTP routes', () => {
     expect(replay.json()).toEqual(first.json());
   });
 
+  it('creates and edits catalog records and prices a sale from the stored product', async () => {
+    const authentication = await authenticate();
+    let sequence = 0;
+    const mutation = async (
+      method: 'POST' | 'PUT',
+      url: string,
+      payload: Record<string, unknown>,
+    ) =>
+      await app.inject({
+        method,
+        url,
+        headers: {
+          cookie: authentication.cookies,
+          'x-sem-caderno-csrf': authentication.csrf,
+          'idempotency-key': `catalog_http_${++sequence}`,
+        },
+        payload,
+      });
+
+    const productResponse = await mutation('POST', '/api/mvp/products', {
+      name: 'Suco regional',
+      priceCents: 750,
+      stockQuantity: 5,
+    });
+    expect(productResponse.statusCode).toBe(201);
+    const product = productResponse.json<{ data: { id: string } }>().data;
+    const updated = await mutation('PUT', `/api/mvp/products/${product.id}`, {
+      name: 'Suco regional 500 ml',
+      priceCents: 800,
+      stockQuantity: 6,
+    });
+    expect(updated.statusCode).toBe(200);
+
+    const customerResponse = await mutation('POST', '/api/mvp/customers', {
+      name: 'Cliente HTTP',
+      phone: '(92) 98165-9847',
+    });
+    const customer = customerResponse.json<{ data: { id: string } }>().data;
+    const editedCustomer = await mutation('PUT', `/api/mvp/customers/${customer.id}`, {
+      name: 'Cliente HTTP editado',
+      phone: '(92) 98165-9847',
+      note: 'Retira no balcão',
+    });
+    expect(editedCustomer.statusCode).toBe(200);
+
+    const sale = await mutation('POST', '/api/mvp/sales', {
+      amountPaidCents: 1_600,
+      paymentMethod: 'pix',
+      items: [{ productId: product.id, quantity: 2 }],
+    });
+    expect(sale.statusCode).toBe(201);
+    expect(sale.json()).toMatchObject({ data: { totalCents: 1_600, status: 'paid' } });
+
+    const snapshot = await app.inject({
+      url: '/api/mvp/snapshot',
+      headers: { cookie: authentication.cookies },
+    });
+    const snapshotBody = snapshot.json<{
+      data: { products: { id: string; stockQuantity: number }[] };
+    }>();
+    expect(snapshotBody.data.products.find((item) => item.id === product.id)).toMatchObject({
+      stockQuantity: 4,
+    });
+  });
+
   it('requires CSRF evidence to sign out and revokes the authenticated session', async () => {
     const authentication = await authenticate();
     const withoutCsrf = await app.inject({

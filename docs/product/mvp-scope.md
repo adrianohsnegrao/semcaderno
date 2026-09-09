@@ -16,7 +16,9 @@ The MVP must remain small enough to validate the product's core promise: "Vendas
 ## Included in the MVP
 
 - Simple customer management.
-- Simple product management with optional photo.
+- Simple product management with editable price and on-hand quantity.
+- Catalog-only sales with server-authoritative product name and price.
+- Automatic stock decrement on sale and restoration on cancellation.
 - Recording a sale as paid or unpaid.
 - Customer purchase and payment history.
 - Partial and full debt payments.
@@ -39,7 +41,7 @@ The MVP must remain small enough to validate the product's core promise: "Vendas
 - Artificial intelligence.
 - Automatic payment reconciliation.
 - A generic plugin or module system.
-- Complex inventory or purchasing management.
+- Complex inventory, suppliers, lots, purchase orders, or purchasing management.
 - Multiple unnecessary configuration options.
 - Features added solely to make the project appear more technically sophisticated.
 
@@ -60,9 +62,14 @@ The web application must be responsive because some merchants may not have a des
 
 Cycle 005 defines the first critical web journey: sign in, resolve the active business, record a fully paid, partially paid, or unpaid sale, create a customer during the sale when debt is involved, record later payments, prepare manual payment requests, and review debt and daily results.
 
-The first journey does not require a product catalog before recording a sale. Ad hoc sale items are allowed so the merchant can start with notebook-like speed while still preserving sale item snapshots.
+The executable portfolio MVP requires a product catalog before recording a sale. This supersedes the
+earlier provisional ad hoc-item choice: catalog-only selection prevents invented items and prices,
+enables simple stock control, and still preserves an immutable sale-item snapshot.
 
-Cycle 006 maps these scope choices into logical records without adding new product features: fully paid counter sales may be anonymous, partial and unpaid sales require a customer, customer contact data remains optional and non-unique, and debt remains derived from sales, payments, and allocations rather than from an editable balance.
+Cycle 006 mapped the original choices into logical records. The executable MVP keeps customer
+contact optional but treats each normalized WhatsApp number as unique inside one establishment.
+Fully paid counter sales may be anonymous, partial and unpaid sales require a customer, and debt
+remains derived from sales and payments rather than from an editable balance.
 
 Cycle 007 maps the same scope into technology-independent application commands and queries. It does not add product features: it clarifies that Sale, Payment, Payment Request, Expense, report, Customer, Product, Membership, and onboarding behavior must pass through server-authoritative contracts that preserve tenant isolation, safe money arithmetic, idempotency, and understandable errors.
 

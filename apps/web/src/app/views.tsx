@@ -2,7 +2,14 @@
 
 import { type FormEvent, useState } from 'react';
 
-import { type Snapshot, money, parseMoney, shortDate } from './model';
+import {
+  type Snapshot,
+  formatMoneyInput,
+  formatPhone,
+  money,
+  parseMoney,
+  shortDate,
+} from './model';
 import { Empty, Modal, SimpleForm } from './ui';
 
 export function Home({
@@ -156,13 +163,23 @@ export function SaleForm({
   data: Snapshot;
   submit: (body: unknown) => Promise<unknown>;
 }) {
-  const [items, setItems] = useState([{ description: '', quantity: 1, price: '' }]);
+  const [items, setItems] = useState([{ productId: '', query: '', quantity: 1 }]);
   const [customerId, setCustomerId] = useState('');
   const [paid, setPaid] = useState<'full' | 'partial' | 'none'>('full');
   const [received, setReceived] = useState('');
   const [method, setMethod] = useState('pix');
   const [busy, setBusy] = useState(false);
-  const total = items.reduce((sum, item) => sum + item.quantity * (parseMoney(item.price) || 0), 0);
+  const [focusedItem, setFocusedItem] = useState<number>();
+  const productFor = (productId: string) =>
+    data.products.find((product) => product.id === productId && product.active);
+  const total = items.reduce(
+    (sum, item) => sum + item.quantity * (productFor(item.productId)?.priceCents ?? 0),
+    0,
+  );
+  const invalidItems = items.some((item) => {
+    const product = productFor(item.productId);
+    return !product || item.quantity < 1 || item.quantity > product.stockQuantity;
+  });
   const amountPaid = paid === 'full' ? total : paid === 'none' ? 0 : parseMoney(received);
   const send = async (event: FormEvent) => {
     event.preventDefault();
@@ -173,9 +190,8 @@ export function SaleForm({
         amountPaidCents: amountPaid,
         paymentMethod: method,
         items: items.map((item) => ({
-          description: item.description,
+          productId: item.productId,
           quantity: item.quantity,
-          unitPriceCents: parseMoney(item.price),
         })),
       });
     } finally {
@@ -189,26 +205,85 @@ export function SaleForm({
           <span className="step">1</span>
           <div>
             <h2>O que foi vendido?</h2>
-            <p>Você pode digitar o item na hora, como faria no caderno.</p>
+            <p>Busque um produto da sua lista. O preço e o estoque são preenchidos pelo sistema.</p>
           </div>
         </div>
         {items.map((item, index) => (
           <div className="sale-item" key={index}>
-            <label className="grow">
+            <label className="grow autocomplete-field">
               Item
               <input
                 required
-                value={item.description}
-                list="products"
-                placeholder="Ex.: 2 refrigerantes"
-                onChange={(event) =>
-                  setItems(
-                    items.map((old, itemIndex) =>
-                      itemIndex === index ? { ...old, description: event.target.value } : old,
-                    ),
+                value={item.query}
+                autoComplete="off"
+                placeholder="Comece a digitar o produto"
+                onFocus={() => setFocusedItem(index)}
+                onBlur={() =>
+                  window.setTimeout(
+                    () => setFocusedItem((current) => (current === index ? undefined : current)),
+                    120,
                   )
                 }
+                onChange={(event) => {
+                  const query = event.target.value;
+                  setItems(
+                    items.map((old, itemIndex) =>
+                      itemIndex === index ? { ...old, query, productId: '' } : old,
+                    ),
+                  );
+                }}
               />
+              {focusedItem === index && (
+                <div className="autocomplete-menu" role="listbox" aria-label="Produtos">
+                  {data.products
+                    .filter((product) => {
+                      const query = item.query.trim().toLocaleLowerCase('pt-BR');
+                      return (
+                        product.active &&
+                        product.stockQuantity > 0 &&
+                        (!query || product.name.toLocaleLowerCase('pt-BR').includes(query))
+                      );
+                    })
+                    .slice(0, 8)
+                    .map((product) => (
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={product.id === item.productId}
+                        key={product.id}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setItems(
+                            items.map((old, itemIndex) =>
+                              itemIndex === index
+                                ? { ...old, productId: product.id, query: product.name }
+                                : old,
+                            ),
+                          );
+                          setFocusedItem(undefined);
+                        }}
+                      >
+                        <span>{product.name}</span>
+                        <small>
+                          {money(product.priceCents)} · {product.stockQuantity} disponíveis
+                        </small>
+                      </button>
+                    ))}
+                  {!data.products.some(
+                    (product) =>
+                      product.active &&
+                      product.stockQuantity > 0 &&
+                      product.name
+                        .toLocaleLowerCase('pt-BR')
+                        .includes(item.query.trim().toLocaleLowerCase('pt-BR')),
+                  ) && <span className="autocomplete-empty">Nenhum produto disponível.</span>}
+                </div>
+              )}
+              <small>
+                {productFor(item.productId)
+                  ? `${productFor(item.productId)!.stockQuantity} em estoque`
+                  : 'Selecione uma opção cadastrada.'}
+              </small>
             </label>
             <label>
               Qtd.
@@ -216,7 +291,7 @@ export function SaleForm({
                 required
                 type="number"
                 min="1"
-                max="999"
+                max={productFor(item.productId)?.stockQuantity ?? 999}
                 value={item.quantity}
                 onChange={(event) =>
                   setItems(
@@ -230,17 +305,9 @@ export function SaleForm({
             <label>
               Valor unitário
               <input
-                required
-                inputMode="decimal"
-                placeholder="0,00"
-                value={item.price}
-                onChange={(event) =>
-                  setItems(
-                    items.map((old, itemIndex) =>
-                      itemIndex === index ? { ...old, price: event.target.value } : old,
-                    ),
-                  )
-                }
+                readOnly
+                aria-label="Valor unitário preenchido automaticamente"
+                value={money(productFor(item.productId)?.priceCents ?? 0)}
               />
             </label>
             {items.length > 1 && (
@@ -255,19 +322,10 @@ export function SaleForm({
             )}
           </div>
         ))}
-        <datalist id="products">
-          {data.products
-            .filter((product) => product.active)
-            .map((product) => (
-              <option key={product.id} value={product.name}>
-                {money(product.priceCents)}
-              </option>
-            ))}
-        </datalist>
         <button
           type="button"
           className="secondary dashed"
-          onClick={() => setItems([...items, { description: '', quantity: 1, price: '' }])}
+          onClick={() => setItems([...items, { productId: '', query: '', quantity: 1 }])}
         >
           + Adicionar outro item
         </button>
@@ -325,7 +383,7 @@ export function SaleForm({
               inputMode="decimal"
               placeholder="0,00"
               value={received}
-              onChange={(event) => setReceived(event.target.value)}
+              onChange={(event) => setReceived(formatMoneyInput(event.target.value))}
             />
           </label>
         )}
@@ -345,13 +403,13 @@ export function SaleForm({
         <span className="eyebrow">RESUMO DA VENDA</span>
         <div className="checkout-items">
           {items
-            .filter((item) => item.description)
+            .filter((item) => item.query)
             .map((item, index) => (
               <span key={index}>
                 <span>
-                  {item.quantity}× {item.description}
+                  {item.quantity}× {item.query}
                 </span>
-                <b>{money(item.quantity * (parseMoney(item.price) || 0))}</b>
+                <b>{money(item.quantity * (productFor(item.productId)?.priceCents ?? 0))}</b>
               </span>
             ))}
         </div>
@@ -367,7 +425,7 @@ export function SaleForm({
           <span>Fica em aberto</span>
           <b>{money(Math.max(0, total - (Number.isFinite(amountPaid) ? amountPaid : 0)))}</b>
         </div>
-        <button className="primary wide" disabled={busy || total <= 0}>
+        <button className="primary wide" disabled={busy || total <= 0 || invalidItems}>
           {busy ? 'Registrando…' : 'Confirmar venda'}
         </button>
         <small className="safe-copy">
@@ -381,17 +439,19 @@ export function SaleForm({
 export function Customers({
   data,
   create,
+  update,
   pay,
   collect,
 }: {
   data: Snapshot;
   create: (body: unknown) => Promise<unknown>;
+  update: (customerId: string, body: unknown) => Promise<unknown>;
   pay: (body: unknown) => Promise<unknown>;
   collect: (body: unknown) => Promise<unknown>;
 }) {
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState<string>();
-  const [action, setAction] = useState<'pay' | 'collect'>();
+  const [action, setAction] = useState<'edit' | 'pay' | 'collect'>();
   const rows = data.customers.map((customer) => ({
     customer,
     sales: data.sales.filter(
@@ -428,7 +488,7 @@ export function Customers({
                 <span className="avatar soft">{customer.name.slice(0, 2).toUpperCase()}</span>
                 <span>
                   <b>{customer.name}</b>
-                  <small>{customer.phone ?? 'Sem telefone'}</small>
+                  <small>{customer.phone ? formatPhone(customer.phone) : 'Sem telefone'}</small>
                 </span>
               </span>
               <span>{sales[0] ? shortDate(sales[0].createdAt) : 'Nenhuma'}</span>
@@ -481,6 +541,9 @@ export function Customers({
               <strong>{current.sales.length}</strong>
             </span>
           </div>
+          <button className="secondary wide" onClick={() => setAction('edit')}>
+            Editar dados do cliente
+          </button>
           {current.debt > 0 && (
             <div className="modal-actions">
               <button className="primary" onClick={() => setAction('pay')}>
@@ -504,6 +567,25 @@ export function Customers({
                 setSelected(undefined);
               }}
               button="Confirmar pagamento"
+            />
+          )}
+          {action === 'edit' && (
+            <SimpleForm
+              fields={[
+                ['name', 'Nome ou apelido', 'text'],
+                ['phone', 'Telefone / WhatsApp', 'tel'],
+                ['note', 'Observação (opcional)', 'text'],
+              ]}
+              defaults={{
+                name: current.customer.name,
+                phone: formatPhone(current.customer.phone),
+                note: current.customer.note ?? '',
+              }}
+              submit={async (body) => {
+                await update(current.customer.id, body);
+                setSelected(undefined);
+              }}
+              button="Salvar alterações"
             />
           )}
           {action === 'collect' && (
@@ -547,31 +629,38 @@ export function Customers({
 export function Products({
   data,
   create,
+  update,
 }: {
   data: Snapshot;
   create: (body: unknown) => Promise<unknown>;
+  update: (productId: string, body: unknown) => Promise<unknown>;
 }) {
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<string>();
+  const current = data.products.find((product) => product.id === editing);
   return (
     <div>
       <div className="page-actions">
-        <p>
-          Uma lista curta para agilizar vendas frequentes. Também é possível vender itens avulsos.
-        </p>
+        <p>Cadastre os itens vendidos, seus preços e a quantidade disponível.</p>
         <button className="primary" onClick={() => setAdding(true)}>
           + Adicionar produto
         </button>
       </div>
       <section className="catalog">
         {data.products.map((product) => (
-          <article className="product-card" key={product.id}>
+          <button className="product-card" key={product.id} onClick={() => setEditing(product.id)}>
             <span className="product-visual">{product.name.slice(0, 1).toUpperCase()}</span>
             <div>
               <h3>{product.name}</h3>
               <strong>{money(product.priceCents)}</strong>
-              <small>{product.active ? 'Disponível nas vendas' : 'Desativado'}</small>
+              <small>
+                {product.stockQuantity > 0
+                  ? `${product.stockQuantity} em estoque`
+                  : 'Sem estoque disponível'}
+              </small>
+              <span className="edit-hint">Editar produto →</span>
             </div>
-          </article>
+          </button>
         ))}
         {!data.products.length && (
           <div className="card">
@@ -588,12 +677,42 @@ export function Products({
             fields={[
               ['name', 'Nome do produto', 'text'],
               ['price', 'Preço de venda', 'money'],
+              ['stockQuantity', 'Quantidade em estoque', 'number'],
             ]}
             submit={async (body) => {
-              await create({ name: body['name'], priceCents: parseMoney(body['price'] ?? '') });
+              await create({
+                name: body['name'],
+                priceCents: parseMoney(body['price'] ?? ''),
+                stockQuantity: Number(body['stockQuantity']),
+              });
               setAdding(false);
             }}
             button="Adicionar produto"
+          />
+        </Modal>
+      )}
+      {current && (
+        <Modal title="Editar produto" close={() => setEditing(undefined)}>
+          <SimpleForm
+            fields={[
+              ['name', 'Nome do produto', 'text'],
+              ['price', 'Preço de venda', 'money'],
+              ['stockQuantity', 'Quantidade em estoque', 'number'],
+            ]}
+            defaults={{
+              name: current.name,
+              price: money(current.priceCents),
+              stockQuantity: String(current.stockQuantity),
+            }}
+            submit={async (body) => {
+              await update(current.id, {
+                name: body['name'],
+                priceCents: parseMoney(body['price'] ?? ''),
+                stockQuantity: Number(body['stockQuantity']),
+              });
+              setEditing(undefined);
+            }}
+            button="Salvar alterações"
           />
         </Modal>
       )}

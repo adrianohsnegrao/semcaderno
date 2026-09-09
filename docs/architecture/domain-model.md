@@ -2,6 +2,11 @@
 
 This document evaluates initial domain concepts without locking the database schema prematurely.
 
+> **Current implementation note:** the [MVP Release Implementation Specification](../specs/mvp-release-implementation.md)
+> supersedes earlier provisional catalog/contact decisions. Executable sales require catalog
+> products, WhatsApp is unique per establishment after normalization, and products have simple
+> on-hand stock.
+
 The detailed domain rules accepted in Cycle 002 are defined in [Domain and Tenancy Specification](../specs/domain-and-tenancy.md). Authentication and onboarding rules accepted in Cycle 003 are defined in [Authentication and Business Onboarding Specification](../specs/authentication-and-business-onboarding.md). Persistence and tenant-enforcement rules accepted in Cycle 004 are defined in [Data Persistence and Tenant Enforcement Specification](../specs/data-persistence-and-tenant-enforcement.md). The first merchant-facing journey accepted in Cycle 005 is defined in [First Critical User Journey Specification](../specs/first-critical-user-journey.md). The logical records, relationships, repository boundaries, and consistency boundaries accepted in Cycle 006 are defined in [Logical Data Model Specification](../specs/logical-data-model.md). The command, query, authorization-context, error, idempotency, and read-model contracts accepted in Cycle 007 are defined in [Application Contracts Specification](../specs/application-contracts.md). This file is a baseline summary and should remain consistent with those specifications.
 
 ## Core Concepts

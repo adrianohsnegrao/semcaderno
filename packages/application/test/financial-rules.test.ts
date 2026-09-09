@@ -1,4 +1,10 @@
-import { FinancialRuleError, applyPayment, previewSale, simpleCashResult } from '../src/index.js';
+import {
+  FinancialRuleError,
+  applyPayment,
+  assertStockAvailable,
+  previewSale,
+  simpleCashResult,
+} from '../src/index.js';
 
 describe('financial rules', () => {
   it('uses integer cents to preview a partially paid sale', () => {
@@ -24,5 +30,10 @@ describe('financial rules', () => {
       status: 'paid',
     });
     expect(simpleCashResult(5000, 1200)).toBe(3800);
+  });
+
+  it('prevents selling more units than are available', () => {
+    expect(() => assertStockAvailable(3, 4)).toThrow(FinancialRuleError);
+    expect(assertStockAvailable(3, 3)).toBeUndefined();
   });
 });

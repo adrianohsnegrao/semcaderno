@@ -11,6 +11,7 @@ export type Product = Readonly<{
   id: string;
   name: string;
   priceCents: number;
+  stockQuantity: number;
   active: boolean;
   createdAt: string;
 }>;
@@ -52,7 +53,7 @@ export type Expense = Readonly<{
 }>;
 export type Activity = Readonly<{
   id: string;
-  kind: 'sale' | 'payment' | 'expense' | 'collection' | 'correction';
+  kind: 'sale' | 'payment' | 'expense' | 'collection' | 'correction' | 'stock';
   title: string;
   detail: string;
   amountCents?: number;
@@ -83,10 +84,8 @@ export type SaleDraft = Readonly<{
   amountPaidCents: number;
   paymentMethod: Payment['method'];
   items: readonly Readonly<{
-    productId?: string;
-    description: string;
+    productId: string;
     quantity: number;
-    unitPriceCents: number;
   }>[];
 }>;
 
@@ -103,9 +102,21 @@ export type MvpStore = Readonly<{
     input: Readonly<{ name: string; phone?: string; note?: string }>,
     idempotencyKey: string,
   ): Promise<Customer>;
+  updateCustomer(
+    session: PublicSession,
+    customerId: string,
+    input: Readonly<{ name: string; phone?: string; note?: string }>,
+    idempotencyKey: string,
+  ): Promise<Customer>;
   createProduct(
     session: PublicSession,
-    input: Readonly<{ name: string; priceCents: number }>,
+    input: Readonly<{ name: string; priceCents: number; stockQuantity: number }>,
+    idempotencyKey: string,
+  ): Promise<Product>;
+  updateProduct(
+    session: PublicSession,
+    productId: string,
+    input: Readonly<{ name: string; priceCents: number; stockQuantity: number }>,
     idempotencyKey: string,
   ): Promise<Product>;
   createSale(session: PublicSession, input: SaleDraft, idempotencyKey: string): Promise<Sale>;
