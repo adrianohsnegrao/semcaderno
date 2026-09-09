@@ -22,7 +22,7 @@
 }
 body {
   margin: 0;
-  background: var(--paper);
+  background: radial-gradient(circle at 85% -10%, #e5f1e8 0, transparent 30rem), var(--paper);
 }
 button,
 input,
@@ -31,6 +31,22 @@ select {
 }
 button {
   cursor: pointer;
+}
+button,
+input,
+select {
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #7ab58e66;
+  outline-offset: 2px;
 }
 .icon {
   width: 21px;
@@ -211,6 +227,16 @@ button {
   align-items: center;
   gap: 12px;
 }
+.mobile-settings {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--green);
+  place-items: center;
+}
 .help,
 .text-button,
 .switch-auth {
@@ -234,6 +260,7 @@ button {
 }
 .primary:hover {
   background: var(--green-dark);
+  transform: translateY(-1px);
 }
 .primary:disabled {
   opacity: 0.5;
@@ -248,6 +275,10 @@ button {
   background: #fff;
   border-color: #cfd7d0;
   color: #284034;
+}
+.secondary:hover {
+  border-color: #9eb8a5;
+  background: #f8fbf8;
 }
 .secondary.dashed {
   width: 100%;
@@ -364,6 +395,13 @@ button {
   border-radius: 15px;
   padding: 23px;
   box-shadow: 0 4px 18px #142a1d08;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.card:hover {
+  border-color: #d1ddd3;
+  box-shadow: 0 8px 24px #142a1d0c;
 }
 .card-head {
   display: flex;
@@ -805,6 +843,11 @@ label small {
 .product-card:hover {
   border-color: #a9c5b3;
   box-shadow: 0 8px 24px #173a2810;
+  transform: translateY(-1px);
+}
+.product-card:focus-visible {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px #3b8c6120;
 }
 .product-visual {
   width: 59px;
@@ -854,6 +897,12 @@ label small {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
   gap: 20px;
+}
+.whatsapp-settings .simple-form {
+  grid-template-columns: 1fr 1fr;
+}
+.whatsapp-settings .simple-form > .wide {
+  grid-column: 1 / -1;
 }
 .whatsapp-settings {
   grid-column: 1 / -1;
@@ -1335,6 +1384,9 @@ label small {
   .top-actions .primary {
     display: none;
   }
+  .mobile-settings {
+    display: grid;
+  }
   .welcome {
     display: block;
     padding: 23px;
@@ -1362,7 +1414,7 @@ label small {
   .mobile-nav {
     position: fixed;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     inset: auto 0 0;
     background: #fff;
     border-top: 1px solid var(--line);
@@ -1378,6 +1430,8 @@ label small {
     gap: 3px;
     font-size: 9px;
     font-weight: 700;
+    min-width: 0;
+    white-space: nowrap;
   }
   .mobile-nav button.active {
     color: var(--green);
@@ -1411,6 +1465,12 @@ label small {
   .catalog,
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+  .whatsapp-settings .simple-form {
+    grid-template-columns: 1fr;
+  }
+  .whatsapp-settings .simple-form > .wide {
+    grid-column: auto;
   }
   .page-actions {
     align-items: flex-start;

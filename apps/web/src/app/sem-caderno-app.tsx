@@ -138,6 +138,13 @@ export function SemCadernoApp() {
             <button className="help" onClick={() => setTour(1)}>
               Como usar
             </button>
+            <button
+              className="mobile-settings"
+              onClick={() => setView('settings')}
+              aria-label="Abrir configurações"
+            >
+              <Icon name="settings" />
+            </button>
             {view !== 'sale' && (
               <button className="primary compact" onClick={() => setView('sale')}>
                 + Registrar venda
@@ -241,7 +248,7 @@ export function SemCadernoApp() {
         )}
       </main>
       <nav className="mobile-nav" aria-label="Menu principal">
-        {nav.slice(0, 5).map((item) => (
+        {nav.map((item) => (
           <button
             key={item.id}
             className={view === item.id ? 'active' : ''}
