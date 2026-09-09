@@ -908,9 +908,10 @@ label small {
   margin: 2px 0 0;
   accent-color: var(--green);
 }
-.checkbox-row span {
+.checkbox-row label {
   display: grid;
   gap: 4px;
+  cursor: pointer;
 }
 .checkbox-row small {
   color: var(--muted);
