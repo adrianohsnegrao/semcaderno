@@ -97,6 +97,7 @@ export function SimpleForm({
             name={name}
             required={!label.includes('opcional')}
             defaultValue={defaults[name]}
+            autoComplete="off"
             type={type === 'money' ? 'text' : type}
             inputMode={type === 'money' ? 'numeric' : undefined}
             min={type === 'number' ? 0 : undefined}
