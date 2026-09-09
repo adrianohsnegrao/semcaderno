@@ -948,8 +948,9 @@ export function Settings({
           Informe os dados da Meta para deixar a integração preparada. Nenhuma mensagem automática
           será enviada até que você ative a configuração.
         </p>
-        <label className="checkbox-row">
+        <label className="checkbox-row" htmlFor="whatsapp-enabled">
           <input
+            id="whatsapp-enabled"
             type="checkbox"
             checked={whatsappEnabled}
             onChange={(event) => setWhatsAppEnabled(event.target.checked)}
