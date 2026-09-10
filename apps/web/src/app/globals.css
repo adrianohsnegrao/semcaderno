@@ -1004,6 +1004,33 @@ label small {
 .modal .simple-form label {
   min-width: 0;
 }
+.edit-panel {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.edit-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.edit-panel-heading .eyebrow {
+  margin-bottom: 3px;
+}
+.edit-panel-heading h3 {
+  margin: 0;
+  font:
+    700 17px Manrope,
+    sans-serif;
+}
+.customer-edit-form {
+  grid-template-columns: 1fr 1fr;
+}
+.customer-edit-form > label:nth-child(3),
+.customer-edit-form > .wide {
+  grid-column: 1 / -1;
+}
 .history {
   border-top: 1px solid var(--line);
   margin-top: 20px;
@@ -1483,6 +1510,13 @@ label small {
     grid-template-columns: 1fr;
   }
   .whatsapp-settings .simple-form > .wide {
+    grid-column: auto;
+  }
+  .customer-edit-form {
+    grid-template-columns: 1fr;
+  }
+  .customer-edit-form > label:nth-child(3),
+  .customer-edit-form > .wide {
     grid-column: auto;
   }
   .page-actions {

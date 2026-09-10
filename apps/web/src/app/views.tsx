@@ -570,23 +570,35 @@ export function Customers({
             />
           )}
           {action === 'edit' && (
-            <SimpleForm
-              fields={[
-                ['name', 'Nome ou apelido', 'text'],
-                ['phone', 'Telefone / WhatsApp', 'tel'],
-                ['note', 'Observação (opcional)', 'text'],
-              ]}
-              defaults={{
-                name: current.customer.name,
-                phone: formatPhone(current.customer.phone),
-                note: current.customer.note ?? '',
-              }}
-              submit={async (body) => {
-                await update(current.customer.id, body);
-                setSelected(undefined);
-              }}
-              button="Salvar alterações"
-            />
+            <div className="edit-panel">
+              <div className="edit-panel-heading">
+                <div>
+                  <span className="eyebrow">DADOS DO CLIENTE</span>
+                  <h3>Atualizar cadastro</h3>
+                </div>
+                <button className="text-button" type="button" onClick={() => setAction(undefined)}>
+                  Voltar
+                </button>
+              </div>
+              <SimpleForm
+                className="customer-edit-form"
+                fields={[
+                  ['name', 'Nome ou apelido', 'text'],
+                  ['phone', 'Telefone / WhatsApp', 'tel'],
+                  ['note', 'Observação (opcional)', 'text'],
+                ]}
+                defaults={{
+                  name: current.customer.name,
+                  phone: formatPhone(current.customer.phone),
+                  note: current.customer.note ?? '',
+                }}
+                submit={async (body) => {
+                  await update(current.customer.id, body);
+                  setSelected(undefined);
+                }}
+                button="Salvar alterações"
+              />
+            </div>
           )}
           {action === 'collect' && (
             <SimpleForm

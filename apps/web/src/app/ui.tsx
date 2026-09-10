@@ -66,16 +66,18 @@ export function SimpleForm({
   defaults = {},
   submit,
   button,
+  className,
 }: {
   fields: [string, string, string][];
   defaults?: Record<string, string>;
   submit: (body: Record<string, string>) => Promise<unknown>;
   button: string;
+  className?: string;
 }) {
   const [busy, setBusy] = useState(false);
   return (
     <form
-      className="simple-form"
+      className={`simple-form${className ? ` ${className}` : ''}`}
       onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setBusy(true);
