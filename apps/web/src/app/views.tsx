@@ -531,43 +531,58 @@ export function Customers({
             setAction(undefined);
           }}
         >
-          <div className="customer-summary">
-            <span>
-              <small>Em aberto</small>
-              <strong>{money(current.debt)}</strong>
-            </span>
-            <span>
-              <small>Compras registradas</small>
-              <strong>{current.sales.length}</strong>
-            </span>
-          </div>
-          <button className="secondary wide" onClick={() => setAction('edit')}>
-            Editar dados do cliente
-          </button>
-          {current.debt > 0 && (
-            <div className="modal-actions">
-              <button className="primary" onClick={() => setAction('pay')}>
-                Registrar pagamento
+          {!action && (
+            <>
+              <div className="customer-summary">
+                <span>
+                  <small>Em aberto</small>
+                  <strong>{money(current.debt)}</strong>
+                </span>
+                <span>
+                  <small>Compras registradas</small>
+                  <strong>{current.sales.length}</strong>
+                </span>
+              </div>
+              <button className="secondary wide" onClick={() => setAction('edit')}>
+                Editar dados do cliente
               </button>
-              <button className="secondary" onClick={() => setAction('collect')}>
-                Preparar lembrete
-              </button>
-            </div>
+              {current.debt > 0 && (
+                <div className="modal-actions">
+                  <button className="primary" onClick={() => setAction('pay')}>
+                    Registrar pagamento
+                  </button>
+                  <button className="secondary" onClick={() => setAction('collect')}>
+                    Preparar lembrete
+                  </button>
+                </div>
+              )}
+            </>
           )}
           {action === 'pay' && (
-            <SimpleForm
-              fields={[['amount', 'Valor recebido', 'money']]}
-              submit={async (body) => {
-                const openSale = current.sales.find((sale) => sale.outstandingCents > 0)!;
-                await pay({
-                  saleId: openSale.id,
-                  amountCents: parseMoney(body['amount'] ?? ''),
-                  method: 'pix',
-                });
-                setSelected(undefined);
-              }}
-              button="Confirmar pagamento"
-            />
+            <div className="action-panel">
+              <div className="action-panel-heading">
+                <div>
+                  <span className="eyebrow">PAGAMENTO</span>
+                  <h3>Registrar recebimento</h3>
+                </div>
+                <button className="text-button" type="button" onClick={() => setAction(undefined)}>
+                  Voltar
+                </button>
+              </div>
+              <SimpleForm
+                fields={[['amount', 'Valor recebido', 'money']]}
+                submit={async (body) => {
+                  const openSale = current.sales.find((sale) => sale.outstandingCents > 0)!;
+                  await pay({
+                    saleId: openSale.id,
+                    amountCents: parseMoney(body['amount'] ?? ''),
+                    method: 'pix',
+                  });
+                  setSelected(undefined);
+                }}
+                button="Confirmar pagamento"
+              />
+            </div>
           )}
           {action === 'edit' && (
             <div className="edit-panel">
@@ -601,37 +616,50 @@ export function Customers({
             </div>
           )}
           {action === 'collect' && (
-            <SimpleForm
-              fields={[['amount', 'Valor do lembrete', 'money']]}
-              submit={async (body) => {
-                const result = (await collect({
-                  customerId: current.customer.id,
-                  amountCents: parseMoney(body['amount'] ?? ''),
-                })) as { whatsappUrl?: string };
-                if (result?.whatsappUrl)
-                  window.open(result.whatsappUrl, '_blank', 'noopener,noreferrer');
-                setSelected(undefined);
-              }}
-              button="Preparar no WhatsApp"
-            />
-          )}
-          <div className="history">
-            <h3>Histórico de compras</h3>
-            {current.sales.map((sale) => (
-              <div key={sale.id}>
-                <span>
-                  <b>{shortDate(sale.createdAt)}</b>
-                  <small>{sale.items.map((item) => item.description).join(', ')}</small>
-                </span>
-                <span>
-                  <b>{money(sale.totalCents)}</b>
-                  <small>
-                    {sale.outstandingCents ? `${money(sale.outstandingCents)} em aberto` : 'Pago'}
-                  </small>
-                </span>
+            <div className="action-panel">
+              <div className="action-panel-heading">
+                <div>
+                  <span className="eyebrow">LEMBRETE</span>
+                  <h3>Preparar mensagem</h3>
+                </div>
+                <button className="text-button" type="button" onClick={() => setAction(undefined)}>
+                  Voltar
+                </button>
               </div>
-            ))}
-          </div>
+              <SimpleForm
+                fields={[['amount', 'Valor do lembrete', 'money']]}
+                submit={async (body) => {
+                  const result = (await collect({
+                    customerId: current.customer.id,
+                    amountCents: parseMoney(body['amount'] ?? ''),
+                  })) as { whatsappUrl?: string };
+                  if (result?.whatsappUrl)
+                    window.open(result.whatsappUrl, '_blank', 'noopener,noreferrer');
+                  setSelected(undefined);
+                }}
+                button="Preparar no WhatsApp"
+              />
+            </div>
+          )}
+          {!action && (
+            <div className="history">
+              <h3>Histórico de compras</h3>
+              {current.sales.map((sale) => (
+                <div key={sale.id}>
+                  <span>
+                    <b>{shortDate(sale.createdAt)}</b>
+                    <small>{sale.items.map((item) => item.description).join(', ')}</small>
+                  </span>
+                  <span>
+                    <b>{money(sale.totalCents)}</b>
+                    <small>
+                      {sale.outstandingCents ? `${money(sale.outstandingCents)} em aberto` : 'Pago'}
+                    </small>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </Modal>
       )}
     </div>

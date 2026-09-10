@@ -1009,6 +1009,11 @@ label small {
   padding-top: 18px;
   border-top: 1px solid var(--line);
 }
+.action-panel {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
 .edit-panel-heading {
   display: flex;
   align-items: flex-start;
@@ -1019,6 +1024,21 @@ label small {
   margin-bottom: 3px;
 }
 .edit-panel-heading h3 {
+  margin: 0;
+  font:
+    700 17px Manrope,
+    sans-serif;
+}
+.action-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.action-panel-heading .eyebrow {
+  margin-bottom: 3px;
+}
+.action-panel-heading h3 {
   margin: 0;
   font:
     700 17px Manrope,
