@@ -996,6 +996,7 @@ label small {
 .modal-actions {
   display: flex;
   gap: 9px;
+  margin-top: 10px;
   margin-bottom: 15px;
 }
 .modal .simple-form {
